@@ -1,3 +1,5 @@
+// ignore_for_file: library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/inventory_provider.dart';
@@ -11,7 +13,7 @@ import 'add_purchase_order_dialog.dart';
 import 'purchase_order_details_dialog.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({Key? key}) : super(key: key);
+  const InventoryScreen({super.key});
 
   @override
   _InventoryScreenState createState() => _InventoryScreenState();

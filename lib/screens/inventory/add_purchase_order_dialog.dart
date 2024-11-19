@@ -11,7 +11,7 @@ import '../../models/inventory_item_model.dart';
 import 'package:intl/intl.dart';
 
 class AddPurchaseOrderDialog extends StatefulWidget {
-  const AddPurchaseOrderDialog({Key? key}) : super(key: key);
+  const AddPurchaseOrderDialog({super.key});
 
   @override
   _AddPurchaseOrderDialogState createState() => _AddPurchaseOrderDialogState();
@@ -489,8 +489,8 @@ class _AddOrderItemDialogState extends State<_AddOrderItemDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         ElevatedButton(
-          child: const Text('Add'),
           onPressed: _addItem,
+          child: const Text('Add'),
         ),
       ],
     );

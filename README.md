@@ -44,7 +44,7 @@ LedgerPro is a modern, cross-platform business management application built with
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/ledgerpro.git
+git clone https://github.com/rajdipk/ledgerpro.git
 ```
 
 2. Navigate to the project directory:
@@ -65,9 +65,9 @@ flutter run
 ## Supported Platforms
 
 - Windows
+- Android
 - macOS (coming soon)
 - Linux (coming soon)
-- Android (coming soon)
 - iOS (coming soon)
 - Web (coming soon)
 
@@ -112,5 +112,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contact
 
-- Project Link: [https://github.com/yourusername/ledgerpro](https://github.com/yourusername/ledgerpro)
+- Project Link: [https://github.com/rajdipk/ledgerpro](https://github.com/yourusername/ledgerpro)
+- mailto: rajdipk98@gmail.com
 - Discord Community: [Join our Discord](coming soon)

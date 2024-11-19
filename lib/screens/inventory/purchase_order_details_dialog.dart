@@ -15,10 +15,12 @@ class PurchaseOrderDetailsDialog extends StatefulWidget {
   });
 
   @override
-  _PurchaseOrderDetailsDialogState createState() => _PurchaseOrderDetailsDialogState();
+  _PurchaseOrderDetailsDialogState createState() =>
+      _PurchaseOrderDetailsDialogState();
 }
 
-class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog> {
+class _PurchaseOrderDetailsDialogState
+    extends State<PurchaseOrderDetailsDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -100,7 +102,8 @@ class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog>
                 title: const Text('Expected Delivery Date'),
                 subtitle: Text(
                   widget.order.expectedDate != null
-                      ? DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.expectedDate!))
+                      ? DateFormat('MMM dd, yyyy')
+                          .format(DateTime.parse(widget.order.expectedDate!))
                       : 'Not set',
                 ),
               ),
@@ -110,7 +113,8 @@ class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog>
               title: const Text('Received Date'),
               subtitle: Text(
                 widget.order.receivedDate != null
-                    ? DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.receivedDate!))
+                    ? DateFormat('MMM dd, yyyy')
+                        .format(DateTime.parse(widget.order.receivedDate!))
                     : widget.order.expectedDate != null
                         ? 'Expected: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.expectedDate!))}'
                         : 'Not received',
@@ -246,7 +250,7 @@ class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog>
   Future<void> _receiveOrder() async {
     try {
       final provider = Provider.of<InventoryProvider>(context, listen: false);
-      
+
       // Create a new purchase order with updated status
       final updatedOrder = widget.order.copyWith(
         status: 'RECEIVED',
@@ -254,7 +258,7 @@ class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog>
       );
 
       await provider.updatePurchaseOrder(updatedOrder);
-      
+
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(

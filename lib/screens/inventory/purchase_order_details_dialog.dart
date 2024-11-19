@@ -1,3 +1,5 @@
+// ignore_for_file: library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/purchase_order_model.dart';
@@ -8,9 +10,9 @@ class PurchaseOrderDetailsDialog extends StatefulWidget {
   final PurchaseOrder order;
 
   const PurchaseOrderDetailsDialog({
-    Key? key,
+    super.key,
     required this.order,
-  }) : super(key: key);
+  });
 
   @override
   _PurchaseOrderDetailsDialogState createState() => _PurchaseOrderDetailsDialogState();

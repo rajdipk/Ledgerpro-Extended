@@ -8,7 +8,8 @@ import 'dart:async';
 import '../dialogs/add_business_dialog.dart';
 import 'package:intl/intl.dart';
 import '../providers/business_provider.dart';
-import 'inventory_coming_soon_screen.dart';
+import '../providers/inventory_provider.dart';
+import 'inventory/inventory_screen.dart';
 
 class NavigationPanel extends StatefulWidget {
   final Function onSettings;
@@ -374,10 +375,18 @@ class _NavigationPanelState extends State<NavigationPanel> {
         icon: Icons.inventory_2_rounded,
         text: 'Inventory',
         onTap: () {
+          final businessProvider = Provider.of<BusinessProvider>(context, listen: false);
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const InventoryComingSoonScreen(),
+              builder: (context) => ChangeNotifierProvider(
+                create: (_) {
+                  final provider = InventoryProvider();
+                  provider.setSelectedBusiness(int.parse(businessProvider.selectedBusinessId ?? '0'));
+                  return provider;
+                },
+                child: const InventoryScreen(),
+              ),
             ),
           );
           if (MediaQuery.of(context).size.width < 600) {

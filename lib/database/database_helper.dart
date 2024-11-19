@@ -8,6 +8,9 @@ import 'package:intl/intl.dart';
 import 'dart:convert'; // For UTF8 encoding
 import 'package:crypto/crypto.dart'; // For hashing the password
 import '../models/transaction_model.dart' as my_model;
+import '../models/inventory_item_model.dart';
+import '../models/stock_movement_model.dart';
+import '../models/purchase_order_model.dart';
 // Import Supplier model
 
 class DatabaseHelper {
@@ -28,7 +31,7 @@ class DatabaseHelper {
 
     // Version set to 1 initially, can be increased for future upgrades
     return await openDatabase(path,
-        version: 3, onCreate: _createDB, onUpgrade: _onUpgrade);
+        version: 4, onCreate: _createDB, onUpgrade: _onUpgrade);
   }
 
   Future _createDB(Database db, int version) async {
@@ -121,6 +124,81 @@ CREATE TABLE supplier_balances (
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
       );
     ''');
+
+    // Create inventory_items table
+    await db.execute('''
+CREATE TABLE inventory_items (
+  id $idType,
+  business_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  sku TEXT,
+  barcode TEXT,
+  category TEXT,
+  unit TEXT NOT NULL,
+  unit_price REAL NOT NULL,
+  cost_price REAL NOT NULL,
+  current_stock INTEGER NOT NULL DEFAULT 0,
+  reorder_level INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (business_id) REFERENCES businesses(id)
+);
+''');
+
+    // Create stock_movements table
+    await db.execute('''
+CREATE TABLE stock_movements (
+  id $idType,
+  business_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  movement_type TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price REAL NOT NULL,
+  total_price REAL NOT NULL,
+  reference_type TEXT,
+  reference_id INTEGER,
+  notes TEXT,
+  date TEXT NOT NULL,
+  FOREIGN KEY (business_id) REFERENCES businesses(id),
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+);
+''');
+
+    // Create purchase_orders table
+    await db.execute('''
+CREATE TABLE purchase_orders (
+  id $idType,
+  business_id INTEGER NOT NULL,
+  supplier_id INTEGER NOT NULL,
+  order_number TEXT NOT NULL,
+  status TEXT NOT NULL,
+  total_amount REAL NOT NULL,
+  notes TEXT,
+  order_date TEXT NOT NULL,
+  expected_date TEXT,
+  received_date TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (business_id) REFERENCES businesses(id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+);
+''');
+
+    // Create purchase_order_items table
+    await db.execute('''
+CREATE TABLE purchase_order_items (
+  id $idType,
+  purchase_order_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price REAL NOT NULL,
+  total_price REAL NOT NULL,
+  received_quantity INTEGER DEFAULT 0,
+  FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+);
+''');
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -155,6 +233,82 @@ CREATE TABLE supplier_balances (
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
       );
       ''');
+    }
+    if (oldVersion < 4) {
+      // Create inventory_items table
+      await db.execute('''
+CREATE TABLE inventory_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  sku TEXT,
+  barcode TEXT,
+  category TEXT,
+  unit TEXT NOT NULL,
+  unit_price REAL NOT NULL,
+  cost_price REAL NOT NULL,
+  current_stock INTEGER NOT NULL DEFAULT 0,
+  reorder_level INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (business_id) REFERENCES businesses(id)
+);
+''');
+
+      // Create stock_movements table
+      await db.execute('''
+CREATE TABLE stock_movements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  movement_type TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price REAL NOT NULL,
+  total_price REAL NOT NULL,
+  reference_type TEXT,
+  reference_id INTEGER,
+  notes TEXT,
+  date TEXT NOT NULL,
+  FOREIGN KEY (business_id) REFERENCES businesses(id),
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+);
+''');
+
+      // Create purchase_orders table
+      await db.execute('''
+CREATE TABLE purchase_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_id INTEGER NOT NULL,
+  supplier_id INTEGER NOT NULL,
+  order_number TEXT NOT NULL,
+  status TEXT NOT NULL,
+  total_amount REAL NOT NULL,
+  notes TEXT,
+  order_date TEXT NOT NULL,
+  expected_date TEXT,
+  received_date TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (business_id) REFERENCES businesses(id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+);
+''');
+
+      // Create purchase_order_items table
+      await db.execute('''
+CREATE TABLE purchase_order_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  purchase_order_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price REAL NOT NULL,
+  total_price REAL NOT NULL,
+  received_quantity INTEGER DEFAULT 0,
+  FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
+  FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+);
+''');
     }
   }
 
@@ -265,6 +419,34 @@ CREATE TABLE supplier_balances (
     await db.delete(
       'supplier_balances',
       where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all inventory items for the business
+    await db.delete(
+      'inventory_items',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all stock movements for the business
+    await db.delete(
+      'stock_movements',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all purchase orders for the business
+    await db.delete(
+      'purchase_orders',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all purchase order items for the business
+    await db.delete(
+      'purchase_order_items',
+      where: 'purchase_order_id IN (SELECT id FROM purchase_orders WHERE business_id = ?)',
       whereArgs: [id],
     );
 
@@ -1013,5 +1195,280 @@ CREATE TABLE supplier_balances (
   Future<List<Map<String, dynamic>>> verifyTransactions() async {
     final db = await database;
     return await db.query('transactions', orderBy: 'date DESC');
+  }
+
+  // Inventory Items Methods
+  Future<InventoryItem> addInventoryItem(InventoryItem item) async {
+    final db = await database;
+    final id = await db.insert('inventory_items', item.toMap());
+    return item.copyWith(id: id);
+  }
+
+  Future<List<InventoryItem>> getInventoryItems(int businessId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_items',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+    );
+    return List.generate(maps.length, (i) => InventoryItem.fromMap(maps[i]));
+  }
+
+  Future<InventoryItem?> getInventoryItem(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_items',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isNotEmpty) {
+      return InventoryItem.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<void> updateInventoryItem(InventoryItem item) async {
+    final db = await database;
+    await db.update(
+      'inventory_items',
+      item.toMap(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  Future<void> deleteInventoryItem(int id) async {
+    final db = await database;
+    await db.delete(
+      'inventory_items',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Stock Movements Methods
+  Future<StockMovement> addStockMovement(StockMovement movement) async {
+    final db = await database;
+    
+    // Start a transaction
+    await db.transaction((txn) async {
+      // Insert the movement
+      final id = await txn.insert('stock_movements', movement.toMap());
+      
+      // Update the inventory item's current stock
+      final item = await getInventoryItem(movement.itemId);
+      if (item != null) {
+        final newStock = movement.movementType == 'IN'
+            ? item.currentStock + movement.quantity
+            : item.currentStock - movement.quantity;
+        
+        await txn.update(
+          'inventory_items',
+          {'current_stock': newStock, 'updated_at': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [movement.itemId],
+        );
+      }
+      
+      movement = movement.copyWith(id: id);
+    });
+    
+    return movement;
+  }
+
+  Future<List<StockMovement>> getStockMovements(int businessId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'stock_movements',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => StockMovement.fromMap(maps[i]));
+  }
+
+  Future<List<StockMovement>> getItemStockMovements(int itemId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'stock_movements',
+      where: 'item_id = ?',
+      whereArgs: [itemId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => StockMovement.fromMap(maps[i]));
+  }
+
+  // Purchase Orders Methods
+  Future<PurchaseOrder> addPurchaseOrder(PurchaseOrder order) async {
+    final db = await database;
+    
+    // Start a transaction
+    await db.transaction((txn) async {
+      // Insert the purchase order
+      final orderId = await txn.insert('purchase_orders', order.toMap());
+      
+      // Insert all purchase order items
+      for (var item in order.items) {
+        await txn.insert('purchase_order_items', {
+          ...item.toMap(),
+          'purchase_order_id': orderId,
+        });
+      }
+      
+      order = order.copyWith(id: orderId);
+    });
+    
+    return order;
+  }
+
+  Future<List<PurchaseOrder>> getPurchaseOrders(int businessId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> orderMaps = await db.query(
+      'purchase_orders',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'order_date DESC',
+    );
+
+    return Future.wait(orderMaps.map((orderMap) async {
+      final List<Map<String, dynamic>> itemMaps = await db.query(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [orderMap['id']],
+      );
+      final items = itemMaps.map((m) => PurchaseOrderItem.fromMap(m)).toList();
+      return PurchaseOrder.fromMap(orderMap, items);
+    }));
+  }
+
+  Future<PurchaseOrder?> getPurchaseOrder(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> orderMaps = await db.query(
+      'purchase_orders',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (orderMaps.isNotEmpty) {
+      final List<Map<String, dynamic>> itemMaps = await db.query(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [id],
+      );
+      final items = itemMaps.map((m) => PurchaseOrderItem.fromMap(m)).toList();
+      return PurchaseOrder.fromMap(orderMaps.first, items);
+    }
+    return null;
+  }
+
+  Future<void> updatePurchaseOrder(PurchaseOrder order) async {
+    final db = await database;
+    
+    // Start a transaction
+    await db.transaction((txn) async {
+      // Update the purchase order
+      await txn.update(
+        'purchase_orders',
+        order.toMap(),
+        where: 'id = ?',
+        whereArgs: [order.id],
+      );
+      
+      // Delete existing items
+      await txn.delete(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [order.id],
+      );
+      
+      // Insert updated items
+      for (var item in order.items) {
+        await txn.insert('purchase_order_items', {
+          ...item.toMap(),
+          'purchase_order_id': order.id,
+        });
+      }
+    });
+  }
+
+  Future<void> deletePurchaseOrder(int id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete purchase order items first
+      await txn.delete(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [id],
+      );
+      
+      // Delete the purchase order
+      await txn.delete(
+        'purchase_orders',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
+  Future<void> updatePurchaseOrderStatus(int id, String status) async {
+    final db = await database;
+    await db.update(
+      'purchase_orders',
+      {
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+        if (status == 'RECEIVED') 'received_date': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> receivePurchaseOrderItems(int orderId, List<PurchaseOrderItem> items) async {
+    final db = await database;
+    
+    // Start a transaction
+    await db.transaction((txn) async {
+      for (var item in items) {
+        // Update received quantity in purchase_order_items
+        await txn.update(
+          'purchase_order_items',
+          {'received_quantity': item.receivedQuantity},
+          where: 'id = ?',
+          whereArgs: [item.id],
+        );
+        
+        // Create stock movement for received items
+        if (item.receivedQuantity > 0) {
+          await txn.insert('stock_movements', StockMovement(
+            businessId: (await getPurchaseOrder(orderId))!.businessId,
+            itemId: item.itemId,
+            movementType: 'IN',
+            quantity: item.receivedQuantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.unitPrice * item.receivedQuantity,
+            referenceType: 'PURCHASE_ORDER',
+            referenceId: orderId,
+            date: DateTime.now().toIso8601String(),
+          ).toMap());
+          
+          // Update inventory item stock
+          final inventoryItem = await getInventoryItem(item.itemId);
+          if (inventoryItem != null) {
+            await txn.update(
+              'inventory_items',
+              {
+                'current_stock': inventoryItem.currentStock + item.receivedQuantity,
+                'updated_at': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [item.itemId],
+            );
+          }
+        }
+      }
+    });
   }
 }

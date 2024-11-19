@@ -1,55 +1,82 @@
-# LedgerPro - Business Management Made Simple
+# LedgerPro Extended - Advanced Business Management Suite
 
 ![LedgerPro Logo](assets/images/accounting.png)
 
-LedgerPro is a modern, cross-platform business management application built with Flutter. It helps small and medium-sized businesses manage their customers, suppliers, and transactions efficiently.
+**PRIVATE REPOSITORY - CONFIDENTIAL**
 
-## Features
+This is the extended version of LedgerPro with advanced features and complete implementation of inventory management, accounting, and business operations. This repository contains proprietary features and improvements.
 
-- **Multi-Business Support**: Manage multiple businesses from a single account
-- **Customer Management**: 
-  - Add and manage customer profiles
-  - Track customer balances
-  - Record transactions
-  - Generate customer statements
-- **Supplier Management**:
-  - Maintain supplier information
-  - Track supplier balances
-  - Record purchases and payments
-- **Transaction Management**:
-  - Record credits and debits
-  - Add transaction details and notes
-  - View transaction history
-- **Reports & Analytics**:
-  - Generate PDF reports
-  - View business analytics
-  - Track customer/supplier statistics
-- **Modern UI/UX**:
-  - Clean and intuitive interface
-  - Dark mode support
-  - Responsive design for all screen sizes
-- **Security**:
-  - Password protection
-  - Data backup and restore
-  - Secure local storage
+## Extended Features
 
-## Getting Started
+### Inventory Management
+- **Complete Item Tracking**:
+  - SKU and barcode support
+  - Real-time stock levels
+  - Low stock alerts
+  - Item categories and tags
+  - Custom attributes
+  
+- **Purchase Order System**:
+  - Create and manage purchase orders
+  - Track order status
+  - Supplier integration
+  - Automatic stock updates
+  - Order history and analytics
+  
+- **Stock Movement**:
+  - Track item movements
+  - Transfer between locations
+  - Movement history
+  - Audit trails
+  
+### Advanced Business Features
+- **Multi-Business Support**: 
+  - Separate inventory per business
+  - Business-specific settings
+  - Role-based access control
+  
+- **Enhanced Supplier Management**:
+  - Detailed supplier profiles
+  - Order history
+  - Payment tracking
+  - Supplier performance metrics
 
-### Prerequisites
-- Flutter (Latest Version)
-- Dart SDK
-- Windows/MacOS/Linux for development
+- **Advanced Analytics**:
+  - Inventory valuation
+  - Stock turnover analysis
+  - Supplier performance reports
+  - Custom report generation
 
-### Installation
+## Development Guidelines
 
-1. Clone the repository:
+### Branch Structure
+- `main`: Production-ready code
+- `develop`: Development branch
+- `feature/*`: Feature branches
+- `hotfix/*`: Hot fixes for production
+
+### Code Standards
+- Follow Flutter/Dart best practices
+- Maintain comprehensive documentation
+- Write unit tests for new features
+- Use meaningful commit messages
+
+### Security Considerations
+- Keep API keys secure
+- Follow data protection guidelines
+- Implement proper error handling
+- Regular security audits
+
+## Installation & Setup
+
+1. Clone the private repository:
 ```bash
-git clone https://github.com/rajdipk/ledgerpro.git
+git clone https://github.com/rajdipk/Ledgerpro-Extended.git
 ```
 
-2. Navigate to the project directory:
+2. Switch to the development branch:
 ```bash
-cd ledgerpro
+git checkout develop
 ```
 
 3. Install dependencies:
@@ -62,56 +89,19 @@ flutter pub get
 flutter run
 ```
 
-## Supported Platforms
-
-- Windows
-- Android
-- macOS (coming soon)
-- Linux (coming soon)
-- iOS (coming soon)
-- Web (coming soon)
-
 ## Contributing
 
-We welcome contributions! If you'd like to contribute:
+This is a private repository. Please follow these guidelines:
+1. Create feature branches from `develop`
+2. Use descriptive commit messages
+3. Update documentation as needed
+4. Create pull requests for review
+5. Ensure all tests pass
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+## License & Confidentiality
 
-## Testing
-
-We're actively looking for testers! Here's how you can help:
-
-1. **Windows Users**: Download the latest release from the Releases page
-2. **Developers**: Clone the repo and run in debug mode
-3. Report issues and suggestions through:
-   - GitHub Issues
-   - Discussions tab
-   - Our TestFlight program (coming soon)
-
-## Feedback & Bug Reports
-
-Found a bug or have a feature request? Please open an issue on GitHub with:
-- Detailed description of the issue/feature
-- Steps to reproduce (for bugs)
-- Screenshots (if applicable)
-- Your environment details
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Flutter team for the amazing framework
-- All our contributors and testers
-- Icons and images from various open-source projects
+This is proprietary software. All rights reserved. Unauthorized copying, distribution, or use is strictly prohibited.
 
 ## Contact
 
-- Project Link: [https://github.com/rajdipk/ledgerpro](https://github.com/yourusername/ledgerpro)
-- mailto: rajdipk98@gmail.com
-- Discord Community: [Join our Discord](coming soon)
+For access or questions, contact the repository owner.

@@ -1,0 +1,29 @@
+feature:
+  - 'feat/*'
+  - 'feature/*'
+
+bug:
+  - 'fix/*'
+  - 'bugfix/*'
+
+documentation:
+  - 'docs/*'
+  - '**/*.md'
+
+enhancement:
+  - 'enhancement/*'
+  - 'improve/*'
+
+ui:
+  - 'lib/screens/*'
+  - 'lib/widgets/*'
+
+database:
+  - 'lib/database/*'
+  - 'lib/models/*'
+
+providers:
+  - 'lib/providers/*'
+
+tests:
+  - 'test/*'

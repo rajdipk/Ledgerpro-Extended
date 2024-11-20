@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ledgerpro/screens/inventory_coming_soon_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 
@@ -111,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSettings: () => _switchContent(const SettingsScreen()),
                 onCustomers: () => _switchContent(const CustomerOperationsScreen()),
                 onSuppliers: () => _switchContent(const SupplierOperationsScreen()),
+                onInventory: ()=> _switchContent(const InventoryComingSoonScreen()),
               ),
             )
           : null,
@@ -124,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSettings: () => _switchContent(const SettingsScreen()),
                 onCustomers: () => _switchContent(const CustomerOperationsScreen()),
                 onSuppliers: () =>_switchContent(const SupplierOperationsScreen()),
+                onInventory: ()=> _switchContent(const InventoryComingSoonScreen()),
               ),
             ),
           Expanded(

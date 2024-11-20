@@ -15,6 +15,9 @@ OutputBaseFilename=LedgerPro-Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+UninstallDisplayIcon={app}\{#MyAppExeName}
+CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -23,7 +26,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+; Exclude database files with the excludes parameter
+Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs; Excludes: "*.db,*.db-journal"
+Source: "windows\dlls\sqlite3.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -31,3 +36,33 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"
+Type: files; Name: "{app}\.dart_tool\*"
+Type: dirifempty; Name: "{app}\.dart_tool"
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  LocalAppData: String;
+  UserAppData: String;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    LocalAppData := ExpandConstant('{localappdata}\{#MyAppName}');
+    UserAppData := ExpandConstant('{userappdata}\{#MyAppName}');
+    
+    // Delete application data directories if they exist
+    if DirExists(LocalAppData) then
+      DelTree(LocalAppData, True, True, True);
+    if DirExists(UserAppData) then
+      DelTree(UserAppData, True, True, True);
+      
+    // Clean up any remaining .dart_tool directory
+    if DirExists(ExpandConstant('{app}\.dart_tool')) then
+      DelTree(ExpandConstant('{app}\.dart_tool'), True, True, True);
+  end;
+end;

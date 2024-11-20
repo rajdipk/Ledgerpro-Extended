@@ -23,10 +23,13 @@ Future<void> main() async {
 
     try {
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        debugPrint('Initializing for desktop platform...');
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;
+        debugPrint('SQLite FFI initialized');
 
         // Initialize window manager
+        debugPrint('Initializing window manager...');
         await windowManager.ensureInitialized();
         
         WindowOptions windowOptions = const WindowOptions(
@@ -42,13 +45,18 @@ Future<void> main() async {
           await windowManager.show();
           await windowManager.focus();
         });
+        debugPrint('Window manager initialized');
       }
 
       // Initialize package_info_plus
+      debugPrint('Initializing package info...');
       await PackageInfo.fromPlatform();
+      debugPrint('Package info initialized');
 
       // Initialize database
+      debugPrint('Initializing database...');
       await DatabaseHelper.instance.database;
+      debugPrint('Database initialized');
 
       runApp(
         MultiProvider(
@@ -61,17 +69,48 @@ Future<void> main() async {
           child: const MyApp(),
         ),
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
       debugPrint('Error during initialization: $error');
-      // Show a user-friendly error screen instead of crashing
+      debugPrint('Stack trace:\n$stackTrace');
+      
+      // Show a more detailed error screen
       runApp(
         MaterialApp(
           home: Scaffold(
             body: Center(
-              child: Text(
-                'Unable to start the application.\nPlease try again later.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.red[700]),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Unable to start the application.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Error: $error',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Please try again later or contact support.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ),

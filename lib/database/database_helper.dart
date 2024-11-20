@@ -2,36 +2,87 @@
 
 // ignore_for_file: avoid_print
 
-import 'package:sqflite/sqflite.dart';
+import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:path/path.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert'; // For UTF8 encoding
 import 'package:crypto/crypto.dart'; // For hashing the password
+import 'dart:io'; // Added import
+import 'dart:ffi';
+import 'package:sqlite3/open.dart';
 import '../models/transaction_model.dart' as my_model;
 // Import Supplier model
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
-  static Database? _database;
+  static sqflite.Database? _database;
 
   DatabaseHelper._init();
 
-  Future<Database> get database async {
+  Future<sqflite.Database> get database async {
     if (_database != null) return _database!;
+
+    if (Platform.isWindows) {
+      // Set the SQLite DLL path for Windows
+      var dllPath = join(Directory.current.path, 'sqlite3.dll');
+      debugPrint('Looking for SQLite DLL at: $dllPath');
+      
+      if (FileSystemEntity.isFileSync(dllPath)) {
+        debugPrint('SQLite DLL found at current directory');
+        open.overrideFor(OperatingSystem.windows, () {
+          return DynamicLibrary.open('sqlite3.dll');
+        });
+      } else {
+        debugPrint('SQLite DLL not found in current directory, checking executable directory');
+        // Try to find it in the executable's directory
+        var exePath = Platform.resolvedExecutable;
+        var exeDir = dirname(exePath);
+        dllPath = join(exeDir, 'sqlite3.dll');
+        
+        if (FileSystemEntity.isFileSync(dllPath)) {
+          debugPrint('SQLite DLL found at: $dllPath');
+          open.overrideFor(OperatingSystem.windows, () {
+            return DynamicLibrary.open(dllPath);
+          });
+        } else {
+          debugPrint('SQLite DLL not found at: $dllPath');
+        }
+      }
+    }
+
     _database = await _initDB('ledgerpro.db');
     return _database!;
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
+  Future<sqflite.Database> _initDB(String filePath) async {
+    final dbPath = await sqflite.getDatabasesPath();
     final path = join(dbPath, filePath);
+    
+    debugPrint('Database path: $path');
+    debugPrint('Checking if directory exists...');
+    
+    // Ensure the directory exists
+    try {
+      await Directory(dbPath).create(recursive: true);
+      debugPrint('Database directory created/exists');
+    } catch (e) {
+      debugPrint('Error creating database directory: $e');
+    }
 
     // Version set to 1 initially, can be increased for future upgrades
-    return await openDatabase(path,
-        version: 3, onCreate: _createDB, onUpgrade: _onUpgrade);
+    return await sqflite.openDatabase(
+      path,
+      version: 3,
+      onCreate: _createDB,
+      onUpgrade: _onUpgrade,
+      onOpen: (db) {
+        debugPrint('Database opened successfully');
+      },
+    );
   }
 
-  Future _createDB(Database db, int version) async {
+  Future _createDB(sqflite.Database db, int version) async {
     const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
     const textType = 'TEXT NOT NULL';
 
@@ -123,7 +174,7 @@ CREATE TABLE supplier_balances (
     ''');
   }
 
-  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  Future _onUpgrade(sqflite.Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       // Drop the old suppliers table
       await db.execute('DROP TABLE IF EXISTS suppliers');
@@ -204,7 +255,7 @@ CREATE TABLE supplier_balances (
     int id = await db.insert(
       'businesses',
       {'name': name},
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
     );
     return id;
   }
@@ -302,7 +353,7 @@ CREATE TABLE supplier_balances (
   // Method to get the count of customers for a specific business
   Future<int> getCustomerCountForBusiness(int businessId) async {
     final db = await instance.database;
-    final count = Sqflite.firstIntValue(await db.rawQuery(
+    final count = sqflite.Sqflite.firstIntValue(await db.rawQuery(
         'SELECT COUNT(*) FROM customers WHERE business_id = ?', [businessId]));
     return count ?? 0;
   }
@@ -561,7 +612,7 @@ CREATE TABLE supplier_balances (
           'receivable_balance': receivableBalance,
           'payable_balance': payableBalance,
         },
-        conflictAlgorithm: ConflictAlgorithm.replace, // Handle conflicts
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace, // Handle conflicts
       );
     }
   }
@@ -839,7 +890,7 @@ CREATE TABLE supplier_balances (
           'date': date,
           'payable_balance': payableBalance,
         },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
       );
     }
   }

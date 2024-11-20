@@ -8,13 +8,13 @@ import 'dart:async';
 import '../dialogs/add_business_dialog.dart';
 import 'package:intl/intl.dart';
 import '../providers/business_provider.dart';
-import 'inventory_coming_soon_screen.dart';
 
 class NavigationPanel extends StatefulWidget {
-  final Function onSettings;
-  final Function onCustomers;
-  final Function onLogout;
-  final Function onSuppliers;
+  final VoidCallback onSettings;
+  final VoidCallback onCustomers;
+  final VoidCallback onLogout;
+  final VoidCallback onSuppliers;
+  final VoidCallback onInventory;
 
   const NavigationPanel({
     super.key,
@@ -22,6 +22,7 @@ class NavigationPanel extends StatefulWidget {
     required this.onSuppliers,
     required this.onSettings,
     required this.onLogout,
+    required this.onInventory,
   });
 
   @override
@@ -374,12 +375,7 @@ class _NavigationPanelState extends State<NavigationPanel> {
         icon: Icons.inventory_2_rounded,
         text: 'Inventory',
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const InventoryComingSoonScreen(),
-            ),
-          );
+          widget.onInventory();
           if (MediaQuery.of(context).size.width < 600) {
             Navigator.pop(context);
           }

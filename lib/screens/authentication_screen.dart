@@ -32,14 +32,11 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
   void initState() {
     super.initState();
     _checkBiometrics();
-    _passwordFocusNode.requestFocus();
     
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-
-
 
     _animationController.forward();
   }
@@ -288,7 +285,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
     return TextFormField(
       controller: controller,
       obscureText: !_isPasswordVisible,
-      focusNode: isConfirmField ? null : _passwordFocusNode,
       validator: _validatePassword,
       decoration: InputDecoration(
         labelText: label,

@@ -323,6 +323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         centerTitle: true,
+        automaticallyImplyLeading: MediaQuery.of(context).size.width < 600, // Only show back button on small screens
       ),
       body: Container(
         decoration: BoxDecoration(

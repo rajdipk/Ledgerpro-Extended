@@ -1,0 +1,99 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          architecture: x64
+      - name: Install project dependencies
+        run: flutter pub get
+      - name: Build Windows
+        run: flutter build windows --release
+      - name: Create Windows ZIP
+        run: |
+          cd build/windows/runner/Release
+          7z a -tzip ../../../LedgerPro-windows.zip *
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-build
+          path: build/LedgerPro-windows.zip
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Install project dependencies
+        run: flutter pub get
+      - name: Build Android APK
+        run: flutter build apk --release
+      - name: Upload Android Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-build
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  create-release:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: windows-build
+          path: windows-build
+      - name: Download android artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: android-build
+          path: android-build
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            windows-build/LedgerPro-windows.zip
+            android-build/app-release.apk
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## LedgerPro Release ${{ github.ref_name }}
+            
+            ### Features
+            - Modern and intuitive business management interface
+            - Customer and supplier management
+            - Transaction tracking and reporting
+            - Multi-currency support
+            - Dark/Light theme support
+            - Business profile management
+            - PDF report generation
+            
+            ### Installation
+            - Windows: Download and extract LedgerPro-windows.zip
+            - Android: Install the app-release.apk on your device
+            
+            ### Requirements
+            - Windows 10 or later (64-bit)
+            - Android 6.0 or later
+            
+            ### Note
+            This is a release build of LedgerPro. For the best experience, please ensure you're using the latest version.

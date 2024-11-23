@@ -165,7 +165,7 @@ class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog>
                                     minWidth: isSmallScreen ? size.width * 0.9 : 750,
                                   ),
                                   child: DataTable(
-                                    headingRowColor: MaterialStateProperty.all(
+                                    headingRowColor: WidgetStateProperty.all(
                                       Colors.teal.withOpacity(0.1),
                                     ),
                                     columnSpacing: isSmallScreen ? 16 : 24,
@@ -387,7 +387,6 @@ class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog>
     showDialog(
       context: context,
       builder: (context) {
-        final remainingQuantity = item.quantity - item.receivedQuantity;
         final TextEditingController quantityController = TextEditingController();
         
         return AlertDialog(

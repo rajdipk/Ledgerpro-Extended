@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ledgerpro/screens/inventory_coming_soon_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 
@@ -11,8 +10,9 @@ import '../providers/business_provider.dart';
 import 'home_screen_design.dart';
 import 'navigation_panel.dart';
 import 'settings.dart';
-import 'customer_operations_screen.dart';
-import 'supplier_operations_screen.dart';
+import '../screens/customer_operations_screen.dart';
+import '../screens/supplier_operations_screen.dart';
+import 'inventory/inventory_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -112,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSettings: () => _switchContent(const SettingsScreen()),
                 onCustomers: () => _switchContent(const CustomerOperationsScreen()),
                 onSuppliers: () => _switchContent(const SupplierOperationsScreen()),
-                onInventory: ()=> _switchContent(const InventoryComingSoonScreen()),
+                onInventory: () => _switchContent(const InventoryScreen()),
               ),
             )
           : null,
@@ -126,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSettings: () => _switchContent(const SettingsScreen()),
                 onCustomers: () => _switchContent(const CustomerOperationsScreen()),
                 onSuppliers: () =>_switchContent(const SupplierOperationsScreen()),
-                onInventory: ()=> _switchContent(const InventoryComingSoonScreen()),
+                onInventory: () => _switchContent(const InventoryScreen()),
               ),
             ),
           Expanded(

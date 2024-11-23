@@ -11,8 +11,11 @@ import 'package:crypto/crypto.dart'; // For hashing the password
 import 'dart:io'; // Added import
 import 'dart:ffi';
 import 'package:sqlite3/open.dart';
+import '../models/inventory_batch_model.dart';
 import '../models/transaction_model.dart' as my_model;
-// Import Supplier model
+import '../models/inventory_item_model.dart'; // Import InventoryItem model
+import '../models/stock_movement_model.dart'; // Import StockMovement model
+import '../models/purchase_order_model.dart'; // Import PurchaseOrder model
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -27,19 +30,20 @@ class DatabaseHelper {
       // Set the SQLite DLL path for Windows
       var dllPath = join(Directory.current.path, 'sqlite3.dll');
       debugPrint('Looking for SQLite DLL at: $dllPath');
-      
+
       if (FileSystemEntity.isFileSync(dllPath)) {
         debugPrint('SQLite DLL found at current directory');
         open.overrideFor(OperatingSystem.windows, () {
           return DynamicLibrary.open('sqlite3.dll');
         });
       } else {
-        debugPrint('SQLite DLL not found in current directory, checking executable directory');
+        debugPrint(
+            'SQLite DLL not found in current directory, checking executable directory');
         // Try to find it in the executable's directory
         var exePath = Platform.resolvedExecutable;
         var exeDir = dirname(exePath);
         dllPath = join(exeDir, 'sqlite3.dll');
-        
+
         if (FileSystemEntity.isFileSync(dllPath)) {
           debugPrint('SQLite DLL found at: $dllPath');
           open.overrideFor(OperatingSystem.windows, () {
@@ -58,10 +62,10 @@ class DatabaseHelper {
   Future<sqflite.Database> _initDB(String filePath) async {
     final dbPath = await sqflite.getDatabasesPath();
     final path = join(dbPath, filePath);
-    
+
     debugPrint('Database path: $path');
     debugPrint('Checking if directory exists...');
-    
+
     // Ensure the directory exists
     try {
       await Directory(dbPath).create(recursive: true);
@@ -73,7 +77,7 @@ class DatabaseHelper {
     // Version set to 1 initially, can be increased for future upgrades
     return await sqflite.openDatabase(
       path,
-      version: 3,
+      version: 6,  // Increased from 5 to 6
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -122,6 +126,9 @@ CREATE TABLE transactions (
   amount REAL,
   date TEXT,
   balance REAL, 
+  notes TEXT,
+  reference_type TEXT,
+  reference_id INTEGER,
   FOREIGN KEY (customer_id) REFERENCES customers(id),
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 );
@@ -172,40 +179,209 @@ CREATE TABLE supplier_balances (
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
       );
     ''');
-  }
-
-  Future _onUpgrade(sqflite.Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Drop the old suppliers table
-      await db.execute('DROP TABLE IF EXISTS suppliers');
-      
-      // Create the new suppliers table with updated schema
-      await db.execute('''
-      CREATE TABLE suppliers (
+    // Create inventory items table
+    await db.execute('''
+      CREATE TABLE inventory_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         business_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        phone TEXT,
-        address TEXT,
-        pan TEXT,
-        gstin TEXT,
-        balance REAL DEFAULT 0,
+        description TEXT,
+        sku TEXT,
+        barcode TEXT,
+        category TEXT,
+        unit TEXT NOT NULL,
+        selling_price REAL NOT NULL, 
+        cost_price REAL NOT NULL,
+        weighted_average_cost REAL NOT NULL,
+        current_stock INTEGER NOT NULL DEFAULT 0,
+        reorder_level INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
         FOREIGN KEY (business_id) REFERENCES businesses(id)
       );
-      ''');
-    }
-    if (oldVersion < 3) {
-      // Add supplier transactions table
-      await db.execute('''
-      CREATE TABLE supplier_transactions (
+    ''');
+    // Create inventory batches table
+    await db.execute('''
+      CREATE TABLE inventory_batches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        supplier_id INTEGER NOT NULL,
-        amount REAL NOT NULL,
+        item_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        cost_price REAL NOT NULL,
+        purchase_date TEXT NOT NULL,
+        reference_type TEXT,
+        reference_id INTEGER,
+        FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+      );
+    ''');
+    // Create stock movements table
+    await db.execute('''
+      CREATE TABLE stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        movement_type TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
+        reference_type TEXT,
+        reference_id INTEGER,
+        notes TEXT,
         date TEXT NOT NULL,
-        balance REAL NOT NULL,
+        FOREIGN KEY (business_id) REFERENCES businesses(id),
+        FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+      );
+    ''');
+    // Create purchase orders table
+    await db.execute('''
+      CREATE TABLE purchase_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL,
+        supplier_id INTEGER NOT NULL,
+        order_number TEXT NOT NULL,
+        status TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        notes TEXT,
+        order_date TEXT NOT NULL,
+        expected_date TEXT,
+        received_date TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (business_id) REFERENCES businesses(id),
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
       );
-      ''');
+    ''');
+    // Create purchase order items table
+    await db.execute('''
+      CREATE TABLE purchase_order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        purchase_order_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        total_price REAL NOT NULL,
+        received_quantity INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
+        FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+      );
+    ''');
+  }
+
+  Future<void> _onUpgrade(
+      sqflite.Database db, int oldVersion, int newVersion) async {
+    debugPrint('Upgrading database from version $oldVersion to $newVersion');
+
+    try {
+      if (oldVersion < 4) {
+        // Drop existing inventory tables if they exist
+        await db.execute('DROP TABLE IF EXISTS stock_movements');
+        await db.execute('DROP TABLE IF EXISTS purchase_order_items');
+        await db.execute('DROP TABLE IF EXISTS purchase_orders');
+        await db.execute('DROP TABLE IF EXISTS inventory_items');
+
+        // Create inventory items table with updated schema
+        await db.execute('''
+          CREATE TABLE inventory_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            sku TEXT DEFAULT '',
+            barcode TEXT DEFAULT '',
+            category TEXT DEFAULT '',
+            unit TEXT NOT NULL,
+            selling_price REAL NOT NULL, 
+            cost_price REAL NOT NULL,
+            weighted_average_cost REAL NOT NULL,
+            current_stock INTEGER NOT NULL DEFAULT 0,
+            reorder_level INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (business_id) REFERENCES businesses(id)
+          )
+        ''');
+
+        // Create inventory batches table
+        await db.execute('''
+          CREATE TABLE inventory_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            cost_price REAL NOT NULL,
+            purchase_date TEXT NOT NULL,
+            reference_type TEXT,
+            reference_id INTEGER,
+            FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+          )
+        ''');
+
+        // Create stock movements table
+        await db.execute('''
+          CREATE TABLE stock_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            movement_type TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            unit_price REAL NOT NULL,
+            total_price REAL NOT NULL,
+            reference_type TEXT DEFAULT '',
+            reference_id INTEGER,
+            notes TEXT DEFAULT '',
+            date TEXT NOT NULL,
+            FOREIGN KEY (business_id) REFERENCES businesses(id),
+            FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+          )
+        ''');
+
+        // Create purchase orders table
+        await db.execute('''
+          CREATE TABLE purchase_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id INTEGER NOT NULL,
+            supplier_id INTEGER NOT NULL,
+            order_number TEXT NOT NULL,
+            status TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            notes TEXT DEFAULT '',
+            order_date TEXT NOT NULL,
+            expected_date TEXT,
+            received_date TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (business_id) REFERENCES businesses(id),
+            FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+          )
+        ''');
+
+        // Create purchase order items table
+        await db.execute('''
+          CREATE TABLE purchase_order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            purchase_order_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            unit_price REAL NOT NULL,
+            total_price REAL NOT NULL,
+            received_quantity INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
+            FOREIGN KEY (item_id) REFERENCES inventory_items(id)
+          )
+        ''');
+      } else if (oldVersion < 5) {
+        // Add new columns to transactions table
+        await db.execute('''
+          ALTER TABLE transactions ADD COLUMN notes TEXT;
+        ''');
+        await db.execute('''
+          ALTER TABLE transactions ADD COLUMN reference_type TEXT;
+        ''');
+        await db.execute('''
+          ALTER TABLE transactions ADD COLUMN reference_id INTEGER;
+        ''');
+      }
+    } catch (e) {
+      debugPrint('Error during database upgrade: $e');
+      rethrow;
     }
   }
 
@@ -316,6 +492,35 @@ CREATE TABLE supplier_balances (
     await db.delete(
       'supplier_balances',
       where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all inventory items for the business
+    await db.delete(
+      'inventory_items',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all stock movements for the business
+    await db.delete(
+      'stock_movements',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all purchase orders for the business
+    await db.delete(
+      'purchase_orders',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all purchase order items for the business
+    await db.delete(
+      'purchase_order_items',
+      where:
+          'purchase_order_id IN (SELECT id FROM purchase_orders WHERE business_id = ?)',
       whereArgs: [id],
     );
 
@@ -454,7 +659,6 @@ CREATE TABLE supplier_balances (
     );
   }
 
-
   Future<double?> getLastTransactionBalance(int customerId) async {
     final db = await instance.database;
     final result = await db.query(
@@ -486,7 +690,6 @@ CREATE TABLE supplier_balances (
       return null; // No previous balance found
     }
   }
-
 
   // Update a transaction balance
   Future<void> updateTransactionBalance(
@@ -560,7 +763,8 @@ CREATE TABLE supplier_balances (
       FROM customers
       WHERE business_id = ? AND balance < 0
     ''', [businessId]);
-    final receivableBalance = ((receivableResult.first['total'] as num?)?.toDouble() ?? 0.0).abs();
+    final receivableBalance =
+        ((receivableResult.first['total'] as num?)?.toDouble() ?? 0.0).abs();
 
     // Calculate total payable (positive balances)
     final payableResult = await db.rawQuery('''
@@ -568,14 +772,15 @@ CREATE TABLE supplier_balances (
       FROM customers
       WHERE business_id = ? AND balance > 0
     ''', [businessId]);
-    final payableBalance = (payableResult.first['total'] as num?)?.toDouble() ?? 0.0;
+    final payableBalance =
+        (payableResult.first['total'] as num?)?.toDouble() ?? 0.0;
 
     // Update or insert into customer_balances
     await upsertCustomerBalances(
       businessId,
       today,
-      receivableBalance,  // Store receivable as negative
-      payableBalance,     // Store payable as positive
+      receivableBalance, // Store receivable as negative
+      payableBalance, // Store payable as positive
     );
   }
 
@@ -612,7 +817,8 @@ CREATE TABLE supplier_balances (
           'receivable_balance': receivableBalance,
           'payable_balance': payableBalance,
         },
-        conflictAlgorithm: sqflite.ConflictAlgorithm.replace, // Handle conflicts
+        conflictAlgorithm:
+            sqflite.ConflictAlgorithm.replace, // Handle conflicts
       );
     }
   }
@@ -744,13 +950,14 @@ CREATE TABLE supplier_balances (
   }
 
   // Get supplier transactions
-  Future<List<Map<String, dynamic>>> getSupplierTransactions(int supplierId) async {
+  Future<List<Map<String, dynamic>>> getSupplierTransactions(
+      int supplierId) async {
     final db = await instance.database;
     final List<Map<String, dynamic>> transactions = await db.query(
       'transactions',
       where: 'supplier_id = ?',
       whereArgs: [supplierId],
-      orderBy: 'date DESC, id DESC',  // Order by date and id in descending order
+      orderBy: 'date DESC, id DESC', // Order by date and id in descending order
     );
 
     // Convert the amount to double for each transaction
@@ -785,15 +992,21 @@ CREATE TABLE supplier_balances (
   Future<int> addSupplierTransaction(my_model.Transaction transaction) async {
     final db = await instance.database;
     return await db.insert('transactions', {
-      'supplier_id': transaction.customerId, // Using customerId field for supplierId
+      'supplier_id':
+          transaction.customerId, // Using customerId field for supplierId
       'amount': transaction.amount,
       'date': transaction.date,
       'balance': transaction.balance,
+      'notes': transaction.notes,
+      'reference_type': transaction.referenceType,
+      'reference_id': transaction.referenceId,
+      'customer_id': null, // This is a supplier transaction
     });
   }
 
   // Update supplier transaction
-  Future<int> updateSupplierTransaction(int id, my_model.Transaction transaction) async {
+  Future<int> updateSupplierTransaction(
+      int id, my_model.Transaction transaction) async {
     final db = await instance.database;
     return await db.update(
       'transactions',
@@ -801,6 +1014,9 @@ CREATE TABLE supplier_balances (
         'amount': transaction.amount,
         'date': transaction.date,
         'balance': transaction.balance,
+        'notes': transaction.notes,
+        'reference_type': transaction.referenceType,
+        'reference_id': transaction.referenceId,
       },
       where: 'id = ? AND supplier_id = ?',
       whereArgs: [id, transaction.customerId],
@@ -818,7 +1034,8 @@ CREATE TABLE supplier_balances (
   }
 
   // Update supplier balance
-  Future<int> updateSupplierBalance(int supplierId, int businessId, double balance) async {
+  Future<int> updateSupplierBalance(
+      int supplierId, int businessId, double balance) async {
     final db = await instance.database;
     return await db.update(
       'suppliers',
@@ -829,7 +1046,8 @@ CREATE TABLE supplier_balances (
   }
 
   // Update supplier transaction balance
-  Future<int> updateSupplierTransactionBalance(int transactionId, double balance) async {
+  Future<int> updateSupplierTransactionBalance(
+      int transactionId, double balance) async {
     final db = await instance.database;
     return await db.update(
       'transactions',
@@ -840,7 +1058,8 @@ CREATE TABLE supplier_balances (
   }
 
   // Add supplier balances record to the database
-  Future<void> addSupplierBalances(int businessId, String date, double payableBalance) async {
+  Future<void> addSupplierBalances(
+      int businessId, String date, double payableBalance) async {
     final db = await database;
     await db.insert('supplier_balances', {
       'business_id': businessId,
@@ -861,8 +1080,10 @@ CREATE TABLE supplier_balances (
   }
 
   // A method to handle upserting (update or insert) the supplier balance data
-  Future<void> upsertSupplierBalances(int businessId, String date, double payableBalance) async {
-    final db = await database;
+  Future<void> upsertSupplierBalances(
+      int businessId, String date, double payableBalance,
+      {sqflite.Transaction? txn}) async {
+    final db = txn ?? await database;
 
     // Check if an entry for the given date already exists
     final existingEntries = await db.query(
@@ -883,15 +1104,11 @@ CREATE TABLE supplier_balances (
       );
     } else {
       // Insert new entry
-      await db.insert(
-        'supplier_balances',
-        {
-          'business_id': businessId,
-          'date': date,
-          'payable_balance': payableBalance,
-        },
-        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
-      );
+      await db.insert('supplier_balances', {
+        'business_id': businessId,
+        'date': date,
+        'payable_balance': payableBalance,
+      });
     }
   }
 
@@ -926,8 +1143,10 @@ CREATE TABLE supplier_balances (
     final db = await database;
 
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day - now.weekday + 1);
-    final endOfWeek = DateTime(now.year, now.month, now.day + (7 - now.weekday));
+    final startOfWeek =
+        DateTime(now.year, now.month, now.day - now.weekday + 1);
+    final endOfWeek =
+        DateTime(now.year, now.month, now.day + (7 - now.weekday));
 
     try {
       final result = await db.rawQuery('''
@@ -988,10 +1207,509 @@ CREATE TABLE supplier_balances (
     }
   }
 
-  Future<Map<String, double>> getBusinessProfitAndCapital(int businessId) async {
+  // Inventory Items Methods
+  Future<List<InventoryItem>> getInventoryItems(int businessId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_items',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+    );
+    return List.generate(maps.length, (i) => InventoryItem.fromMap(maps[i]));
+  }
+
+  Future<InventoryItem?> getInventoryItem(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_items',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return InventoryItem.fromMap(maps.first);
+  }
+
+  Future<int> addInventoryItem(InventoryItem item) async {
+    final db = await database;
+    try {
+      return await db.insert('inventory_items', item.toMap(),
+          conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+    } catch (e) {
+      debugPrint('Error adding inventory item: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateInventoryItem(InventoryItem item) async {
+    final db = await database;
+    try {
+      await db.update(
+        'inventory_items',
+        item.toMap(),
+        where: 'id = ?',
+        whereArgs: [item.id],
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      debugPrint('Error updating inventory item: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteInventoryItem(int id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // First check if there are any related stock movements
+      final movements = await txn.query(
+        'stock_movements',
+        where: 'item_id = ?',
+        whereArgs: [id],
+      );
+
+      if (movements.isNotEmpty) {
+        throw Exception('Cannot delete item with existing stock movements');
+      }
+
+      // Check if there are any related purchase order items
+      final purchaseOrderItems = await txn.query(
+        'purchase_order_items',
+        where: 'item_id = ?',
+        whereArgs: [id],
+      );
+
+      if (purchaseOrderItems.isNotEmpty) {
+        throw Exception('Cannot delete item with existing purchase orders');
+      }
+
+      // If no related records exist, delete the item
+      await txn.delete(
+        'inventory_items',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
+  // Stock Movements Methods
+  Future<List<StockMovement>> getStockMovements(int businessId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'stock_movements',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => StockMovement.fromMap(maps[i]));
+  }
+
+  Future<int> addStockMovement(StockMovement movement) async {
+    final db = await database;
+    int movementId = 0;
+
+    try {
+      // Start a transaction with immediate mode to prevent deadlocks
+      await db.transaction((txn) async {
+        // Get the current item with a row lock
+        final List<Map<String, dynamic>> itemMaps = await txn.query(
+          'inventory_items',
+          where: 'id = ?',
+          whereArgs: [movement.itemId],
+        );
+
+        if (itemMaps.isEmpty) {
+          throw Exception('Item not found');
+        }
+
+        final item = InventoryItem.fromMap(itemMaps.first);
+
+        // Calculate new stock level
+        final newStock = movement.movementType == 'IN'
+            ? item.currentStock + movement.quantity
+            : item.currentStock - movement.quantity;
+
+        if (movement.movementType == 'OUT' && newStock < 0) {
+          throw Exception('Insufficient stock');
+        }
+
+        // Calculate new weighted average cost for stock IN movements
+        double newWeightedAverageCost = item.weightedAverageCost;
+        if (movement.movementType == 'IN' && movement.quantity > 0) {
+          final totalOldValue = item.currentStock * item.weightedAverageCost;
+          final newValue = movement.quantity * movement.unitPrice;
+          newWeightedAverageCost = (totalOldValue + newValue) / newStock;
+        }
+
+        // Update the inventory item's current stock and weighted average cost
+        await txn.update(
+          'inventory_items',
+          {
+            'current_stock': newStock,
+            'weighted_average_cost': newWeightedAverageCost,
+            'updated_at': DateTime.now().toIso8601String()
+          },
+          where: 'id = ?',
+          whereArgs: [movement.itemId],
+        );
+
+        // Insert the movement
+        movementId = await txn.insert('stock_movements', movement.toMap());
+      }, exclusive: true); // Use exclusive mode for the transaction
+
+      return movementId;
+    } catch (e) {
+      debugPrint('Error adding stock movement: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<StockMovement>> getItemStockMovements(int itemId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'stock_movements',
+      where: 'item_id = ?',
+      whereArgs: [itemId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => StockMovement.fromMap(maps[i]));
+  }
+
+  // Debug method to verify transactions
+  Future<List<Map<String, dynamic>>> verifyTransactions() async {
+    final db = await database;
+    return await db.query('transactions', orderBy: 'date DESC');
+  }
+
+  // Purchase Orders Methods
+  Future<List<PurchaseOrder>> getPurchaseOrders(int businessId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> orderMaps = await db.query(
+      'purchase_orders',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'order_date DESC, id DESC', // Added id as secondary sort
+    );
+
+    return Future.wait(orderMaps.map((orderMap) async {
+      final List<Map<String, dynamic>> itemMaps = await db.query(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [orderMap['id']],
+      );
+      final items = itemMaps.map((m) => PurchaseOrderItem.fromMap(m)).toList();
+      return PurchaseOrder.fromMap(orderMap, items);
+    }));
+  }
+
+  Future<PurchaseOrder?> getPurchaseOrder(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> orderMaps = await db.query(
+      'purchase_orders',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (orderMaps.isEmpty) return null;
+
+    final List<Map<String, dynamic>> itemMaps = await db.query(
+      'purchase_order_items',
+      where: 'purchase_order_id = ?',
+      whereArgs: [id],
+    );
+    final items = itemMaps.map((m) => PurchaseOrderItem.fromMap(m)).toList();
+    return PurchaseOrder.fromMap(orderMaps.first, items);
+  }
+
+  Future<int> addPurchaseOrder(PurchaseOrder order) async {
+    final db = await database;
+
+    int orderId = 0;
+    // Start a transaction
+    await db.transaction((txn) async {
+      // Insert the purchase order first
+      final orderMap = order.toMap();
+      orderMap.remove('id'); // Remove id to let SQLite auto-increment
+      orderId = await txn.insert('purchase_orders', orderMap);
+
+      // Insert all purchase order items with the correct purchase_order_id
+      for (var item in order.items) {
+        final itemMap = item.toMap();
+        itemMap.remove('id'); // Remove id to let SQLite auto-increment
+        itemMap['purchase_order_id'] =
+            orderId; // Set the correct purchase_order_id
+        await txn.insert('purchase_order_items', itemMap);
+      }
+    });
+
+    return orderId;
+  }
+
+  Future<void> updatePurchaseOrder(PurchaseOrder order) async {
+    final db = await database;
+
+    // Start a transaction
+    await db.transaction((txn) async {
+      // Update the purchase order
+      await txn.update(
+        'purchase_orders',
+        order.toMap(),
+        where: 'id = ?',
+        whereArgs: [order.id],
+      );
+
+      // Delete existing items
+      await txn.delete(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [order.id],
+      );
+
+      // Insert updated items
+      for (var item in order.items) {
+        await txn.insert('purchase_order_items', {
+          ...item.toMap(),
+          'purchase_order_id': order.id,
+        });
+      }
+    });
+  }
+
+  Future<void> deletePurchaseOrder(int id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete purchase order items first
+      await txn.delete(
+        'purchase_order_items',
+        where: 'purchase_order_id = ?',
+        whereArgs: [id],
+      );
+
+      // Delete the purchase order
+      await txn.delete(
+        'purchase_orders',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
+  Future<void> updatePurchaseOrderStatus(int id, String status) async {
+    final db = await database;
+    await db.update(
+      'purchase_orders',
+      {
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+        if (status == 'RECEIVED')
+          'received_date': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> receivePurchaseOrderItems(
+      int orderId, List<PurchaseOrderItem> items) async {
+    final db = await database;
+
+    try {
+      await db.transaction((txn) async {
+        // Get the order to update its status
+        final List<Map<String, dynamic>> orderMaps = await txn.query(
+          'purchase_orders',
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+
+        if (orderMaps.isEmpty) {
+          throw Exception('Order not found');
+        }
+
+        // Check if order is already received
+        final order = PurchaseOrder.fromMap(orderMaps.first, []);
+        if (order.status == 'RECEIVED') {
+          throw Exception('Order is already received');
+        }
+
+        // Update order status and received date
+        await txn.update(
+          'purchase_orders',
+          {
+            'status': 'RECEIVED',
+            'received_date': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+
+        // Process each item
+        for (var item in items) {
+          if (item.receivedQuantity <= 0) continue;
+
+          // Get the current inventory item with batches
+          final List<Map<String, dynamic>> itemMaps = await txn.query(
+            'inventory_items',
+            where: 'id = ?',
+            whereArgs: [item.itemId],
+          );
+
+          if (itemMaps.isEmpty) {
+            throw Exception('Inventory item not found');
+          }
+
+          final inventoryItem = InventoryItem.fromMap(itemMaps.first);
+
+          // Create new batch for received items
+          final batch = InventoryBatch(
+            itemId: item.itemId,
+            quantity: item.receivedQuantity,
+            costPrice: item.unitPrice,
+            purchaseDate: DateTime.now().toIso8601String(),
+            referenceType: 'PURCHASE_ORDER',
+            referenceId: orderId,
+          );
+
+          await txn.insert('inventory_batches', batch.toMap());
+
+          // Get all batches to calculate new weighted average cost
+          final List<Map<String, dynamic>> batchMaps = await txn.query(
+            'inventory_batches',
+            where: 'item_id = ?',
+            whereArgs: [item.itemId],
+          );
+
+          final batches = batchMaps.map((m) => InventoryBatch.fromMap(m)).toList();
+          final newItem = InventoryItem.fromMap(itemMaps.first, batches: batches);
+
+          // Calculate new weighted average cost
+          final newWeightedAvgCost = newItem.calculateWeightedAverageCost();
+          final newStock = inventoryItem.currentStock + item.receivedQuantity;
+
+          // Update inventory item
+          await txn.update(
+            'inventory_items',
+            {
+              'current_stock': newStock,
+              'weighted_average_cost': newWeightedAvgCost,
+              'cost_price': item.unitPrice, // Latest purchase price
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [item.itemId],
+          );
+
+          // Update purchase order item
+          await txn.update(
+            'purchase_order_items',
+            {
+              'received_quantity': item.receivedQuantity,
+            },
+            where: 'id = ?',
+            whereArgs: [item.id],
+          );
+
+          // Create stock movement record
+          await txn.insert('stock_movements', {
+            'business_id': inventoryItem.businessId,
+            'item_id': item.itemId,
+            'movement_type': 'IN',
+            'quantity': item.receivedQuantity,
+            'unit_price': item.unitPrice,
+            'total_price': item.unitPrice * item.receivedQuantity,
+            'reference_type': 'PURCHASE_ORDER',
+            'reference_id': orderId,
+            'notes': 'Received from PO #$orderId',
+            'date': DateTime.now().toIso8601String(),
+          });
+        }
+
+        // Calculate total amount for supplier transaction
+        double totalAmount = items.fold(0, (sum, item) => 
+          sum + (item.receivedQuantity * item.unitPrice));
+
+        // Get supplier ID from purchase order
+        final supplierId = orderMaps.first['supplier_id'] as int;
+        final businessId = orderMaps.first['business_id'] as int;
+
+        // Get current supplier balance
+        final List<Map<String, dynamic>> supplierMaps = await txn.query(
+          'suppliers',
+          where: 'id = ?',
+          whereArgs: [supplierId],
+        );
+
+        if (supplierMaps.isEmpty) {
+          throw Exception('Supplier not found');
+        }
+
+        final currentBalance = supplierMaps.first['balance'] as double;
+        final newBalance = currentBalance + totalAmount;
+
+        // Create supplier transaction in transactions table
+        await txn.insert('transactions', {
+          'supplier_id': supplierId,
+          'amount': totalAmount,  // Positive amount for payable to supplier
+          'date': DateTime.now().toIso8601String(),
+          'notes': 'Purchase Order #$orderId received',
+          'balance': newBalance,
+          'reference_type': 'PURCHASE_ORDER',
+          'reference_id': orderId,
+          'customer_id': null,  // This is a supplier transaction
+        });
+
+        // Update supplier balance
+        await txn.update(
+          'suppliers',
+          {'balance': newBalance},
+          where: 'id = ?',
+          whereArgs: [supplierId],
+        );
+
+        // Update supplier balances record using the transaction
+        await upsertSupplierBalances(
+          businessId,
+          DateTime.now().toIso8601String().split('T')[0],
+          newBalance,
+          txn: txn,
+        );
+      });
+    } catch (e) {
+      debugPrint('Error receiving purchase order items: $e');
+      rethrow;
+    }
+  }
+
+  Future<String> generatePurchaseOrderNumber(int businessId) async {
+    final db = await database;
+
+    // Get the latest order number for the business
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT order_number 
+      FROM purchase_orders 
+      WHERE business_id = ? 
+      ORDER BY id DESC 
+      LIMIT 1
+    ''', [businessId]);
+
+    if (result.isEmpty) {
+      // First order for this business
+      return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}001';
+    }
+
+    final String lastOrderNumber = result.first['order_number'] as String;
+    // Extract the sequence number (last 3 digits)
+    final int sequence = int.parse(lastOrderNumber.substring(lastOrderNumber.length - 3)) + 1;
+    // Create new order number with current date
+    return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}${sequence.toString().padLeft(3, '0')}';
+  }
+
+  Future<Map<String, double>> getBusinessProfitAndCapital(
+      int businessId) async {
     final db = await database;
     final now = DateTime.now();
-    
+
     try {
       // Get total receivable from customers
       final customerReceivableResult = await db.rawQuery('''
@@ -999,7 +1717,9 @@ CREATE TABLE supplier_balances (
         FROM customers
         WHERE business_id = ? AND balance < 0
       ''', [businessId]);
-      final customerReceivable = ((customerReceivableResult.first['total'] as num?)?.toDouble() ?? 0.0).abs();
+      final customerReceivable =
+          ((customerReceivableResult.first['total'] as num?)?.toDouble() ?? 0.0)
+              .abs();
 
       // Get total payable to customers
       final customerPayableResult = await db.rawQuery('''
@@ -1007,7 +1727,8 @@ CREATE TABLE supplier_balances (
         FROM customers
         WHERE business_id = ? AND balance > 0
       ''', [businessId]);
-      final customerPayable = (customerPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
+      final customerPayable =
+          (customerPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
 
       // Get total payable to suppliers
       final supplierPayableResult = await db.rawQuery('''
@@ -1015,10 +1736,12 @@ CREATE TABLE supplier_balances (
         FROM suppliers
         WHERE business_id = ? AND balance != 0
       ''', [businessId]);
-      final supplierPayable = (supplierPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
+      final supplierPayable =
+          (supplierPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
 
       // Calculate total capital (receivable - payable)
-      final totalCapital = customerReceivable - (customerPayable + supplierPayable);
+      final totalCapital =
+          customerReceivable - (customerPayable + supplierPayable);
 
       // Get this month's transactions
       final startOfMonth = DateTime(now.year, now.month, 1);
@@ -1043,8 +1766,10 @@ CREATE TABLE supplier_balances (
         DateFormat('yyyy-MM-dd').format(endOfMonth)
       ]);
 
-      final monthReceivable = (monthProfitResult.first['receivable'] as num).toDouble();
-      final monthPayable = (monthProfitResult.first['payable'] as num).toDouble();
+      final monthReceivable =
+          (monthProfitResult.first['receivable'] as num).toDouble();
+      final monthPayable =
+          (monthProfitResult.first['payable'] as num).toDouble();
       final monthlyProfit = monthReceivable - monthPayable;
 
       return {
@@ -1060,9 +1785,13 @@ CREATE TABLE supplier_balances (
     }
   }
 
-  // Debug method to verify transactions
-  Future<List<Map<String, dynamic>>> verifyTransactions() async {
+  Future<List<InventoryBatch>> getInventoryBatches(int itemId) async {
     final db = await database;
-    return await db.query('transactions', orderBy: 'date DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_batches',
+      where: 'item_id = ?',
+      whereArgs: [itemId],
+    );
+    return List.generate(maps.length, (i) => InventoryBatch.fromMap(maps[i]));
   }
 }

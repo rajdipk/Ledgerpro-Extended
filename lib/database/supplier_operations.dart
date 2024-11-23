@@ -12,9 +12,10 @@ class SupplierOperations {
 
   Future<Database> get database async => await _databaseHelper.database;
 
-  Future<int> addSupplier(Supplier supplier) async {
+  Future<Supplier> addSupplier(Supplier supplier) async {
     final db = await database;
-    return await db.insert('suppliers', supplier.toMap());
+    final id = await db.insert('suppliers', supplier.toMap());
+    return supplier.copyWith(id: id);
   }
 
   Future<List<Supplier>> getSuppliers(int businessId) async {
@@ -25,6 +26,18 @@ class SupplierOperations {
       whereArgs: [businessId],
     );
     return List.generate(maps.length, (i) => Supplier.fromMap(maps[i]));
+  }
+
+  Future<Supplier?> getSupplierById(int supplierId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'suppliers',
+      where: 'id = ?',
+      whereArgs: [supplierId],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Supplier.fromMap(maps.first);
   }
 
   Future<int> updateSupplier(Supplier supplier) async {

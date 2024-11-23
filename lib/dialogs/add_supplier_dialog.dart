@@ -11,7 +11,7 @@ import '../providers/business_provider.dart';
 
 class AddSupplierDialog extends StatefulWidget {
   final int businessId;
-  final Function? onSupplierAdded;
+  final Function(Supplier)? onSupplierAdded;
 
   const AddSupplierDialog({
     super.key,
@@ -137,12 +137,12 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
               );
 
               try {
-                await _supplierOps.addSupplier(supplier);
+                final newSupplier = await _supplierOps.addSupplier(supplier);
                 if (mounted) {
                   Navigator.of(context).pop();
                   // Refresh supplier count in BusinessProvider
                   await Provider.of<BusinessProvider>(context, listen: false).refreshSuppliers();
-                  widget.onSupplierAdded?.call();
+                  widget.onSupplierAdded?.call(newSupplier);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Supplier added successfully'),

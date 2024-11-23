@@ -3,6 +3,7 @@ import '../database/database_helper.dart';
 import '../models/inventory_item_model.dart';
 import '../models/stock_movement_model.dart';
 import '../models/purchase_order_model.dart';
+import '../models/transaction_model.dart';
 
 class InventoryProvider with ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -14,7 +15,9 @@ class InventoryProvider with ChangeNotifier {
   // Getters
   List<InventoryItem> get items => _items;
   List<StockMovement> get movements => _movements;
-  List<PurchaseOrder> get purchaseOrders => _purchaseOrders;
+  List<PurchaseOrder> get purchaseOrders => 
+    List.from(_purchaseOrders)..sort((a, b) => 
+      DateTime.parse(b.orderDate).compareTo(DateTime.parse(a.orderDate)));
   int get selectedBusinessId => _selectedBusinessId;
 
   // Set selected business
@@ -62,12 +65,16 @@ class InventoryProvider with ChangeNotifier {
   }
 
   Future<void> addMovement(StockMovement movement) async {
-    await _db.addStockMovement(movement);
-    await Future.wait([
-      refreshMovements(),
-      refreshItems(), // Refresh items as stock levels will change
-    ]);
-    notifyListeners();
+    try {
+      await _db.addStockMovement(movement);
+      // Refresh data sequentially to prevent database locking
+      await refreshMovements();
+      await refreshItems();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error in addMovement: $e');
+      rethrow;
+    }
   }
 
   Future<List<StockMovement>> getItemMovements(int itemId) async {
@@ -103,14 +110,47 @@ class InventoryProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> receivePurchaseOrder(int orderId, List<PurchaseOrderItem> items) async {
-    await _db.receivePurchaseOrderItems(orderId, items);
-    await Future.wait([
-      refreshPurchaseOrders(),
-      refreshItems(),
-      refreshMovements(),
-    ]);
-    notifyListeners();
+  Future<void> receivePurchaseOrder(
+      int orderId, List<PurchaseOrderItem> items) async {
+    try {
+      // Get the purchase order details first
+      final order = await _db.getPurchaseOrder(orderId);
+      if (order == null) {
+        throw Exception('Purchase order not found');
+      }
+
+      // Only proceed if the order is not already received
+      if (order.status == 'RECEIVED') {
+        throw Exception('Order is already received');
+      }
+
+      // Process the order items - this will create stock movements
+      await _db.receivePurchaseOrderItems(orderId, items);
+
+      // Calculate total amount received
+      double totalReceived = items
+          .where((item) => item.receivedQuantity > 0)
+          .fold(0, (sum, item) => sum + (item.unitPrice * item.receivedQuantity));
+
+      // Create a supplier transaction for the received amount
+      if (totalReceived > 0) {
+        final transaction = Transaction(
+          supplierId: order.supplierId,
+          amount: totalReceived,
+          date: DateTime.now().toIso8601String(),
+          balance: 0,
+        );
+        await _db.addSupplierTransaction(transaction);
+      }
+
+      await refreshPurchaseOrders();
+      await refreshItems();
+      await refreshMovements();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error in receivePurchaseOrder: $e');
+      rethrow;
+    }
   }
 
   // Helper Methods
@@ -123,11 +163,14 @@ class InventoryProvider with ChangeNotifier {
   }
 
   List<InventoryItem> getLowStockItems() {
-    return _items.where((item) => item.currentStock <= item.reorderLevel).toList();
+    return _items
+        .where((item) => item.currentStock <= item.reorderLevel)
+        .toList();
   }
 
   double getTotalInventoryValue() {
-    return _items.fold(0, (sum, item) => sum + (item.costPrice * item.currentStock));
+    return _items.fold(
+        0, (sum, item) => sum + (item.costPrice * item.currentStock));
   }
 
   Map<String, int> getStockMovementSummary() {

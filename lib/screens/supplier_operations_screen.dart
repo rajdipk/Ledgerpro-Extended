@@ -168,9 +168,9 @@ class _SupplierOperationsScreenState extends State<SupplierOperationsScreen> {
         context: context,
         builder: (context) => AddSupplierDialog(
           businessId: int.parse(businessProvider.selectedBusinessId!),
-          onSupplierAdded: () {
-            Provider.of<BusinessProvider>(context, listen: false).refreshSuppliers();
-          },
+          onSupplierAdded: (Supplier supplier) {
+  Provider.of<BusinessProvider>(context, listen: false).refreshSuppliers();
+},
         ),
       );
     } else {

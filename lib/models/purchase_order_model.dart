@@ -46,7 +46,8 @@ class PurchaseOrder {
     };
   }
 
-  factory PurchaseOrder.fromMap(Map<String, dynamic> map, List<PurchaseOrderItem> items) {
+  factory PurchaseOrder.fromMap(
+      Map<String, dynamic> map, List<PurchaseOrderItem> items) {
     return PurchaseOrder(
       id: map['id'] as int?,
       businessId: map['business_id'] as int,

@@ -2,8 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../database/database_helper.dart';
+import '../../database/supplier_operations.dart';
 import '../../models/purchase_order_model.dart';
 import '../../providers/inventory_provider.dart';
+import '../../providers/business_provider.dart';
 import 'package:intl/intl.dart';
 
 class PurchaseOrderDetailsDialog extends StatefulWidget {
@@ -19,255 +22,660 @@ class PurchaseOrderDetailsDialog extends StatefulWidget {
       _PurchaseOrderDetailsDialogState();
 }
 
-class _PurchaseOrderDetailsDialogState
-    extends State<PurchaseOrderDetailsDialog> {
+class _PurchaseOrderDetailsDialogState extends State<PurchaseOrderDetailsDialog> {
+  late final SupplierOperations _supplierOps;
+
+  @override
+  void initState() {
+    super.initState();
+    _supplierOps = SupplierOperations(DatabaseHelper.instance);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final businessProvider = Provider.of<BusinessProvider>(context, listen: false);
+      final supplier = await _supplierOps.getSupplierById(widget.order.supplierId);
+      if (supplier != null && mounted) {
+        businessProvider.setSelectedSupplier(supplier);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 600;
+
     return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      child: Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppBar(
-              title: Text('Order #${widget.order.orderNumber}'),
-              automaticallyImplyLeading: false,
-              actions: [
-                if (widget.order.status == 'ORDERED')
-                  TextButton.icon(
-                    icon: const Icon(Icons.check, color: Colors.white),
-                    label: const Text(
-                      'Receive',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    onPressed: _showReceiveDialog,
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildOrderHeader(),
-                      const SizedBox(height: 24),
-                      _buildOrderItems(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: theme.colorScheme.surface,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isSmallScreen ? size.width * 0.95 : 800,
+          maxHeight: size.height * 0.9,
         ),
-      ),
-    );
-  }
-
-  Widget _buildOrderHeader() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Order #${widget.order.orderNumber}',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Status: ${widget.order.status}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getStatusColor(widget.order.status),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Order Date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.orderDate))}',
-              style: const TextStyle(fontSize: 16),
-            ),
-            if (widget.order.expectedDate != null) ...[
-              const SizedBox(height: 8),
-              ListTile(
-                title: const Text('Expected Delivery Date'),
-                subtitle: Text(
-                  widget.order.expectedDate != null
-                      ? DateFormat('MMM dd, yyyy')
-                          .format(DateTime.parse(widget.order.expectedDate!))
-                      : 'Not set',
-                ),
+        child: Scaffold(
+          appBar: AppBar(
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: Colors.teal,
+            foregroundColor: Colors.white,
+            title: const Text('Purchase Order Details'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
               ),
             ],
-            const SizedBox(height: 8),
-            ListTile(
-              title: const Text('Received Date'),
-              subtitle: Text(
-                widget.order.receivedDate != null
-                    ? DateFormat('MMM dd, yyyy')
-                        .format(DateTime.parse(widget.order.receivedDate!))
-                    : widget.order.expectedDate != null
-                        ? 'Expected: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.expectedDate!))}'
-                        : 'Not received',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Total Amount: ${NumberFormat.currency(symbol: '\$').format(widget.order.totalAmount)}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (widget.order.notes?.isNotEmpty ?? false) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Notes:',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.order.notes!,
-                style: const TextStyle(fontSize: 16),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOrderItems() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Order Items',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
           ),
-        ),
-        const SizedBox(height: 16),
-        Consumer<InventoryProvider>(
-          builder: (context, provider, child) {
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: widget.order.items.length,
-              itemBuilder: (context, index) {
-                final item = widget.order.items[index];
-                final inventoryItem = provider.getItemById(item.itemId);
-                if (inventoryItem == null) return const SizedBox.shrink();
-
-                return Card(
-                  child: ListTile(
-                    title: Text(inventoryItem.name),
-                    subtitle: Text(
-                      'SKU: ${inventoryItem.sku ?? 'N/A'} | Ordered: ${item.quantity}',
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          NumberFormat.currency(symbol: '\$')
-                              .format(item.unitPrice),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.info_outline,
+                                        color: Colors.teal),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Order Information',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.teal,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    _buildStatusChip(widget.order.status),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                _buildInfoRow('Order Number', widget.order.orderNumber),
+                                _buildInfoRow(
+                                  'Order Date',
+                                  DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.orderDate)),
+                                ),
+                                if (widget.order.expectedDate != null)
+                                  _buildInfoRow(
+                                    'Expected Delivery',
+                                    DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.order.expectedDate!)),
+                                  ),
+                                Consumer<BusinessProvider>(
+                                  builder: (context, provider, _) {
+                                    final supplier = provider.selectedSupplier;
+                                    return _buildInfoRow(
+                                      'Supplier',
+                                      supplier?.name ?? 'Unknown Supplier',
+                                    );
+                                  },
+                                ),
+                                if (widget.order.notes?.isNotEmpty ?? false)
+                                  _buildInfoRow('Notes', widget.order.notes!),
+                              ],
+                            ),
                           ),
                         ),
-                        Text(
-                          'Total: ${NumberFormat.currency(symbol: '\$').format(item.totalPrice)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                        const SizedBox(height: 24),
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.inventory_2_outlined,
+                                        color: Colors.teal),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Order Items',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.teal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minWidth: isSmallScreen ? size.width * 0.9 : 750,
+                                  ),
+                                  child: DataTable(
+                                    headingRowColor: MaterialStateProperty.all(
+                                      Colors.teal.withOpacity(0.1),
+                                    ),
+                                    columnSpacing: isSmallScreen ? 16 : 24,
+                                    horizontalMargin: isSmallScreen ? 8 : 16,
+                                    columns: const [
+                                      DataColumn(label: Text('Item')),
+                                      DataColumn(label: Text('Quantity')),
+                                      DataColumn(label: Text('Unit Price')),
+                                      DataColumn(label: Text('Total')),
+                                      DataColumn(label: Text('Received')),
+                                      DataColumn(label: Text('Actions')),
+                                    ],
+                                    rows: widget.order.items.map((item) {
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(
+                                            Consumer<InventoryProvider>(
+                                              builder: (context, provider, _) {
+                                                final inventoryItem = provider.getItemById(item.itemId);
+                                                return Text(inventoryItem?.name ?? 'Unknown Item');
+                                              },
+                                            ),
+                                          ),
+                                          DataCell(Text(item.quantity.toString())),
+                                          DataCell(Text(NumberFormat.currency(
+                                            symbol: '\$',
+                                            decimalDigits: 2,
+                                          ).format(item.unitPrice))),
+                                          DataCell(Text(NumberFormat.currency(
+                                            symbol: '\$',
+                                            decimalDigits: 2,
+                                          ).format(item.totalPrice))),
+                                          DataCell(Text(item.receivedQuantity.toString())),
+                                          DataCell(
+                                            Container(
+                                              constraints: BoxConstraints(
+                                                minWidth: isSmallScreen ? 80 : 100,
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (item.receivedQuantity < item.quantity)
+                                                    SizedBox(
+                                                      height: 36,
+                                                      child: FilledButton.tonal(
+                                                        style: FilledButton.styleFrom(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 16,
+                                                            vertical: 8,
+                                                          ),
+                                                        ),
+                                                        onPressed: () => _showReceiveDialog(item),
+                                                        child: const Text('Receive'),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'Total Order Value: ',
+                                      style: theme.textTheme.titleMedium,
+                                    ),
+                                    Text(
+                                      NumberFormat.currency(
+                                        symbol: '\$',
+                                        decimalDigits: 2,
+                                      ).format(widget.order.items.fold(
+                                        0.0,
+                                        (sum, item) => sum + item.totalPrice,
+                                      )),
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                );
-              },
-            );
-          },
+                ),
+                if (widget.order.status.toLowerCase() != 'completed')
+                  Container(
+                    padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      border: Border(
+                        top: BorderSide(
+                          color: theme.colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _hasUnreceivedItems()
+                              ? _showReceiveItemsDialog
+                              : null,
+                          icon: const Icon(Icons.inventory),
+                          label: const Text('Receive Items'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => _updateOrderStatus('completed'),
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('Complete Order'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    String label,
+    String value, {
+    TextStyle? valueStyle,
+    Color? statusColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+        ),
+        Expanded(
+          child: statusColor != null
+              ? Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              : Text(
+                  value,
+                  style: valueStyle,
+                ),
         ),
       ],
     );
   }
 
+  Widget _buildStatusChip(String status) {
+    return Chip(
+      label: Text(status.toUpperCase()),
+      backgroundColor: _getStatusColor(status).withOpacity(0.1),
+      labelStyle: TextStyle(
+        color: _getStatusColor(status),
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
-    switch (status) {
-      case 'ORDERED':
-        return Colors.blue;
-      case 'RECEIVED':
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'ordered':
+        return Colors.teal;
+      case 'received':
         return Colors.green;
-      case 'CANCELLED':
+      case 'cancelled':
         return Colors.red;
+      case 'draft':
+        return Colors.grey;
       default:
         return Colors.grey;
     }
   }
 
-  void _showReceiveDialog() {
+  void _showReceiveDialog(PurchaseOrderItem item) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Receive Order'),
-        content: const Text(
-          'Are you sure you want to mark this order as received? '
-          'This will update the inventory levels.',
-        ),
-        actions: [
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.of(context).pop(),
+      builder: (context) {
+        final remainingQuantity = item.quantity - item.receivedQuantity;
+        final TextEditingController quantityController = TextEditingController();
+        
+        return AlertDialog(
+          title: const Text('Receive Item'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Consumer<InventoryProvider>(
+                builder: (context, provider, _) {
+                  final inventoryItem = provider.getItemById(item.itemId);
+                  return Text('Item: ${inventoryItem?.name ?? 'Unknown Item'}');
+                },
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please confirm the quantity received for this item:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Ordered: ${item.quantity}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: quantityController,
+                      decoration: const InputDecoration(
+                        labelText: 'Received',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        final qty = int.tryParse(value);
+                        if (qty == null || qty < 0) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton(
-            child: const Text('Receive'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _receiveOrder();
-            },
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Receive'),
+              onPressed: () async {
+                final currentContext = context;
+                // Update received quantity
+                final receivedQty =
+                    int.tryParse(quantityController.text) ?? 0;
+
+                final updatedItem = item.copyWith(receivedQuantity: receivedQty);
+
+                try {
+                  final provider =
+                      Provider.of<InventoryProvider>(currentContext, listen: false);
+                  
+                  if (widget.order.id == null) {
+                    throw Exception('Invalid order ID');
+                  }
+                  
+                  await provider.receivePurchaseOrder(
+                      widget.order.id!, [updatedItem]);
+
+                  if (!mounted) return;
+                  Navigator.of(currentContext).pop(); // Close receive dialog
+                  Navigator.of(currentContext).pop(); // Close order details dialog
+
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Order received successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  Navigator.of(currentContext).pop(); // Close receive dialog
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Error receiving order: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Future<void> _receiveOrder() async {
+  void _updateOrderStatus(String status) async {
     try {
-      final provider = Provider.of<InventoryProvider>(context, listen: false);
-
-      // Create a new purchase order with updated status
-      final updatedOrder = widget.order.copyWith(
-        status: 'RECEIVED',
-        receivedDate: DateTime.now().toIso8601String(),
-      );
-
-      await provider.updatePurchaseOrder(updatedOrder);
+      final provider =
+          Provider.of<InventoryProvider>(context, listen: false);
+      
+      if (widget.order.id == null) {
+        throw Exception('Invalid order ID');
+      }
+      
+      await provider.updatePurchaseOrderStatus(widget.order.id!, status);
 
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(); // Close order details dialog
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order received successfully')),
+        SnackBar(
+          content: Text('Order status updated to $status'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error receiving order: $e')),
+        SnackBar(
+          content: Text('Error updating order status: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
+  }
+
+  bool _hasUnreceivedItems() {
+    return widget.order.items.any((item) => item.receivedQuantity < item.quantity);
+  }
+
+  void _showReceiveItemsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final unreceivedItems = widget.order.items
+            .where((item) => item.receivedQuantity < item.quantity)
+            .toList();
+        final Map<int, TextEditingController> controllers = {
+          for (var item in unreceivedItems)
+            item.itemId: TextEditingController()
+        };
+
+        return AlertDialog(
+          title: const Text('Receive Items'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter received quantities for the following items:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                ...unreceivedItems.map((item) {
+                  final remainingQuantity = item.quantity - item.receivedQuantity;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Consumer<InventoryProvider>(
+                            builder: (context, provider, _) {
+                              final inventoryItem = provider.getItemById(item.itemId);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    inventoryItem?.name ?? 'Unknown Item',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    'Ordered: ${item.quantity}, Received: ${item.receivedQuantity}',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.outline,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: controllers[item.itemId],
+                            decoration: InputDecoration(
+                              labelText: 'Receive',
+                              border: const OutlineInputBorder(),
+                              helperText: 'Max: $remainingQuantity',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Receive All'),
+              onPressed: () async {
+                final currentContext = context;
+                final updatedItems = <PurchaseOrderItem>[];
+
+                for (var item in unreceivedItems) {
+                  final receivedQty = int.tryParse(
+                          controllers[item.itemId]?.text ?? '') ??
+                      0;
+                  if (receivedQty > 0) {
+                    updatedItems.add(
+                      item.copyWith(
+                        receivedQuantity: item.receivedQuantity + receivedQty,
+                      ),
+                    );
+                  }
+                }
+
+                if (updatedItems.isEmpty) {
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter at least one quantity'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final provider = Provider.of<InventoryProvider>(
+                      currentContext,
+                      listen: false);
+
+                  if (widget.order.id == null) {
+                    throw Exception('Invalid order ID');
+                  }
+
+                  await provider.receivePurchaseOrder(
+                      widget.order.id!, updatedItems);
+
+                  if (!mounted) return;
+                  Navigator.of(currentContext).pop(); // Close receive dialog
+                  Navigator.of(currentContext).pop(); // Close order details dialog
+
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Items received successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  Navigator.of(currentContext).pop(); // Close receive dialog
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Error receiving items: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }

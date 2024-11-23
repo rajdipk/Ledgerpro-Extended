@@ -14,6 +14,7 @@ import 'screens/home_screen.dart';
 import 'providers/business_provider.dart'; 
 import 'providers/currency_provider.dart'; 
 import 'providers/theme_provider.dart';
+import 'providers/inventory_provider.dart';
 import 'screens/settings.dart';
 import 'mannuals/user_manual_screen.dart';
 
@@ -61,10 +62,10 @@ Future<void> main() async {
       runApp(
         MultiProvider(
           providers: [
-            ChangeNotifierProvider(create: (_) => BusinessProvider()), 
             ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => BusinessProvider()), 
             ChangeNotifierProvider(create: (_) => CurrencyProvider()),
-            // Add other providers if needed
+            ChangeNotifierProvider(create: (_) => InventoryProvider()),
           ],
           child: const MyApp(),
         ),

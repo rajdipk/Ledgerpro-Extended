@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/inventory_item_model.dart';
 import '../../models/stock_movement_model.dart';
 import '../../providers/inventory_provider.dart';
+import '../../providers/currency_provider.dart';
 import 'package:intl/intl.dart';
 
 class ItemDetailsDialog extends StatefulWidget {
@@ -23,7 +24,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
   late TextEditingController _barcodeController;
   late TextEditingController _categoryController;
   late TextEditingController _unitController;
-  late TextEditingController _unitPriceController;
+  late TextEditingController _sellingPriceController;
   late TextEditingController _costPriceController;
   late TextEditingController _reorderLevelController;
   bool _isEditing = false;
@@ -37,7 +38,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
     _barcodeController = TextEditingController(text: widget.item.barcode);
     _categoryController = TextEditingController(text: widget.item.category);
     _unitController = TextEditingController(text: widget.item.unit);
-    _unitPriceController = TextEditingController(text: widget.item.unitPrice.toString());
+    _sellingPriceController = TextEditingController(text: widget.item.sellingPrice.toString());
     _costPriceController = TextEditingController(text: widget.item.costPrice.toString());
     _reorderLevelController = TextEditingController(text: widget.item.reorderLevel.toString());
   }
@@ -50,7 +51,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
     _barcodeController.dispose();
     _categoryController.dispose();
     _unitController.dispose();
-    _unitPriceController.dispose();
+    _sellingPriceController.dispose();
     _costPriceController.dispose();
     _reorderLevelController.dispose();
     super.dispose();
@@ -95,7 +96,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailsSection(),
+                      _buildDetailsSection(context),
                       const Divider(height: 32),
                       _buildStockMovementsSection(),
                     ],
@@ -109,7 +110,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
     );
   }
 
-  Widget _buildDetailsSection() {
+  Widget _buildDetailsSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -121,15 +122,15 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildTextField('Name', _nameController),
-        _buildTextField('Description', _descriptionController),
-        _buildTextField('SKU', _skuController),
-        _buildTextField('Barcode', _barcodeController),
-        _buildTextField('Category', _categoryController),
-        _buildTextField('Unit', _unitController),
-        _buildTextField('Unit Price', _unitPriceController, isNumber: true),
-        _buildTextField('Cost Price', _costPriceController, isNumber: true),
-        _buildTextField('Reorder Level', _reorderLevelController, isNumber: true),
+        _buildDetailRow('Name', _nameController.text, context),
+        _buildDetailRow('Description', _descriptionController.text, context),
+        _buildDetailRow('SKU', _skuController.text, context),
+        _buildDetailRow('Barcode', _barcodeController.text, context),
+        _buildDetailRow('Category', _categoryController.text, context),
+        _buildDetailRow('Unit', _unitController.text, context),
+        _buildDetailRow('Selling Price', double.parse(_sellingPriceController.text), context, isPrice: true),
+        _buildDetailRow('Cost Price', double.parse(_costPriceController.text), context, isPrice: true),
+        _buildDetailRow('Reorder Level', _reorderLevelController.text, context),
         const SizedBox(height: 16),
         Card(
           child: Padding(
@@ -218,18 +219,31 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {bool isNumber = false}) {
+  Widget _buildDetailRow(String label, dynamic value, BuildContext context, {bool isPrice = false}) {
+    String displayValue = value.toString();
+    if (isPrice) {
+      final currencyProvider = Provider.of<CurrencyProvider>(context);
+      displayValue = '${currencyProvider.currencySymbol} ${(value as double).toStringAsFixed(2)}';
+    }
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        enabled: _isEditing,
-        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(displayValue),
+          ),
+        ],
       ),
     );
   }
@@ -243,7 +257,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
         barcode: _barcodeController.text,
         category: _categoryController.text,
         unit: _unitController.text,
-        unitPrice: double.parse(_unitPriceController.text),
+        sellingPrice: double.parse(_sellingPriceController.text),
         costPrice: double.parse(_costPriceController.text),
         reorderLevel: int.parse(_reorderLevelController.text),
         updatedAt: DateTime.now().toIso8601String(),

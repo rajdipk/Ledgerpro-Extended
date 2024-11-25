@@ -11,6 +11,14 @@ class BarcodeService {
     return barcode.trim().replaceAll(RegExp(r'[^\w\d]'), '');
   }
 
+  Future<String> processBarcode(String barcode) async {
+    final cleanedCode = cleanBarcode(barcode);
+    if (cleanedCode.isEmpty) {
+      throw Exception('Invalid barcode format');
+    }
+    return cleanedCode;
+  }
+
   Future<Map<String, dynamic>?> getProductInfo(String barcode) async {
     try {
       final response = await http.get(

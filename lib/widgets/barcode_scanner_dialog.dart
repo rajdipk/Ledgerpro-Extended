@@ -28,27 +28,100 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
   }
 
   Future<void> _initializeScanner() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      setState(() {
+        _isCameraAvailable = false;
+        _errorMessage = 'Camera scanning is not available on desktop. Please use manual entry or a USB barcode scanner.';
+      });
+      return;
+    }
+
     try {
       _controller = MobileScannerController(
         detectionSpeed: DetectionSpeed.normal,
         facing: CameraFacing.back,
         torchEnabled: _torchEnabled,
       );
-      
-      if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
-        await _controller?.start();
-      } else {
-        setState(() {
-          _isCameraAvailable = false;
-          _errorMessage = 'Camera scanning is not available on desktop. Please use manual entry or a USB barcode scanner.';
-        });
-      }
+      await _controller?.start();
     } catch (e) {
       debugPrint('Error initializing scanner: $e');
       setState(() {
         _isCameraAvailable = false;
         _errorMessage = 'Camera not available. Please use manual entry.';
       });
+    }
+  }
+
+  Widget _buildDesktopBarcodeInput() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.barcode_reader,
+          size: 48,
+          color: Colors.grey,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Use a USB Barcode Scanner or Enter Code Manually',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16),
+        ),
+        const SizedBox(height: 24),
+        TextField(
+          controller: _manualController,
+          autofocus: true,  // Auto-focus for barcode scanner
+          decoration: const InputDecoration(
+            labelText: 'Barcode',
+            hintText: 'Scan or type barcode',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.qr_code),
+          ),
+          onSubmitted: (value) async {
+            if (value.isNotEmpty) {
+              await _processBarcode(value);
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton(
+          onPressed: () async {
+            if (_manualController.text.isNotEmpty) {
+              await _processBarcode(_manualController.text);
+            }
+          },
+          child: const Text('Submit'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _processBarcode(String barcode) async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      // Play a success sound
+      await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+      
+      // Process the barcode
+      final result = await _barcodeService.processBarcode(barcode);
+      if (mounted) {
+        Navigator.of(context).pop(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error processing barcode: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
@@ -71,7 +144,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (_isCameraAvailable)
+                if (_isCameraAvailable && _controller != null)
                   IconButton(
                     icon: Icon(_torchEnabled ? Icons.flash_on : Icons.flash_off),
                     onPressed: () {
@@ -83,147 +156,145 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
                   ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () {
-                    _controller?.dispose();
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            if (_isCameraAvailable) ...[
-              Expanded(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: MobileScanner(
-                        controller: _controller,
-                        onDetect: (capture) => _handleBarcode(capture.barcodes),
-                        errorBuilder: (context, error, child) {
-                          debugPrint('Scanner error: $error');
-                          return _buildManualEntry();
-                        },
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.green,
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      width: 200,
-                      height: 200,
-                    ),
-                  ],
-                ),
-              ),
-              const Text(
-                'Position the barcode within the frame or use a USB scanner',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-            ] else
-              _buildManualEntry(),
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.orange),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            if (_isProcessing)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(),
-              ),
+            Expanded(
+              child: Platform.isWindows || Platform.isLinux || Platform.isMacOS
+                  ? _buildDesktopBarcodeInput()
+                  : _buildMobileScanner(),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildManualEntry() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _manualController,
-            decoration: const InputDecoration(
-              labelText: 'Enter Barcode Manually',
-              hintText: 'Type or scan barcode using USB scanner',
-              border: OutlineInputBorder(),
+  Widget _buildMobileScanner() {
+    if (!_isCameraAvailable) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.red,
             ),
-            onSubmitted: (value) => _processBarcode(value),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {
-              if (_manualController.text.isNotEmpty) {
-                _processBarcode(_manualController.text);
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'Camera not available',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: MobileScanner(
+            controller: _controller,
+            onDetect: (capture) async {
+              final List<Barcode> barcodes = capture.barcodes;
+              if (barcodes.isNotEmpty) {
+                final String? code = barcodes.first.rawValue;
+                if (code != null) {
+                  await _processBarcode(code);
+                }
               }
             },
-            child: const Text('Process Barcode'),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'You can also use a USB barcode scanner',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+        // Scanning overlay
+        CustomPaint(
+          painter: ScannerOverlayPainter(),
+          child: const SizedBox(
+            width: 200,
+            height: 200,
           ),
-        ],
-      ),
+        ),
+      ],
     );
-  }
-
-  Future<void> _handleBarcode(List<Barcode> barcodes) async {
-    if (_isProcessing || barcodes.isEmpty) return;
-    
-    final String? code = barcodes.first.rawValue;
-    if (code != null) {
-      debugPrint('Barcode detected: $code');
-      try {
-        await _audioPlayer.play(AssetSource('sounds/beep.mp3'), volume: 0.5);
-      } catch (e) {
-        debugPrint('Error playing audio: $e');
-      }
-      _processBarcode(code);
-    }
-  }
-
-  Future<void> _processBarcode(String code) async {
-    if (_isProcessing) return;
-
-    setState(() {
-      _isProcessing = true;
-      _errorMessage = null;
-    });
-
-    try {
-      debugPrint('Processing barcode: $code');
-      final cleanedCode = _barcodeService.cleanBarcode(code);
-      Navigator.of(context).pop(cleanedCode);
-    } catch (e) {
-      debugPrint('Error processing barcode: $e');
-      if (!mounted) return;
-      setState(() {
-        _isProcessing = false;
-        _errorMessage = 'Error processing barcode. Please try again.';
-      });
-    }
   }
 
   @override
   void dispose() {
-    _controller?.stop().then((_) {
+    if (_controller != null && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+      _controller?.stop();
       _controller?.dispose();
-    });
+    }
     _manualController.dispose();
     super.dispose();
   }
+}
+
+class ScannerOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double borderWidth = 3.0;
+    const double cornerLength = 20.0;
+    final Paint borderPaint = Paint()
+      ..color = Colors.green
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = borderWidth;
+
+    // Draw corners
+    // Top left
+    canvas.drawLine(
+      const Offset(0, cornerLength),
+      const Offset(0, 0),
+      borderPaint,
+    );
+    canvas.drawLine(
+      const Offset(0, 0),
+      const Offset(cornerLength, 0),
+      borderPaint,
+    );
+
+    // Top right
+    canvas.drawLine(
+      Offset(size.width - cornerLength, 0),
+      Offset(size.width, 0),
+      borderPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width, 0),
+      Offset(size.width, cornerLength),
+      borderPaint,
+    );
+
+    // Bottom left
+    canvas.drawLine(
+      const Offset(0, cornerLength),
+      Offset(0, size.height - cornerLength),
+      borderPaint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(cornerLength, size.height),
+      borderPaint,
+    );
+
+    // Bottom right
+    canvas.drawLine(
+      Offset(size.width - cornerLength, size.height),
+      Offset(size.width, size.height),
+      borderPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width, size.height - cornerLength),
+      Offset(size.width, size.height),
+      borderPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

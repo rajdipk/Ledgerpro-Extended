@@ -143,9 +143,14 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
                   style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Stock Value: ${NumberFormat.currency(symbol: '\$').format(widget.item.currentStock * widget.item.costPrice)}',
-                  style: const TextStyle(fontSize: 16),
+                Consumer<CurrencyProvider>(
+                  builder: (context, currencyProvider, _) => Text(
+                    'Stock Value: ${NumberFormat.currency(
+                      symbol: currencyProvider.currencySymbol,
+                      decimalDigits: 2,
+                    ).format(widget.item.currentStock * widget.item.costPrice)}',
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ],
             ),
@@ -220,12 +225,38 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
   }
 
   Widget _buildDetailRow(String label, dynamic value, BuildContext context, {bool isPrice = false}) {
-    String displayValue = value.toString();
     if (isPrice) {
-      final currencyProvider = Provider.of<CurrencyProvider>(context);
-      displayValue = '${currencyProvider.currencySymbol} ${(value as double).toStringAsFixed(2)}';
+      return Consumer<CurrencyProvider>(
+        builder: (context, currencyProvider, _) {
+          final displayValue = NumberFormat.currency(
+            symbol: currencyProvider.currencySymbol,
+            decimalDigits: 2,
+          ).format(value as double);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 120,
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(displayValue),
+                ),
+              ],
+            ),
+          );
+        },
+      );
     }
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -241,7 +272,7 @@ class _ItemDetailsDialogState extends State<ItemDetailsDialog> {
             ),
           ),
           Expanded(
-            child: Text(displayValue),
+            child: Text(value.toString()),
           ),
         ],
       ),

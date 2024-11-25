@@ -479,7 +479,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
           localizedReason: 'Authenticate to access LedgerPro',
           options: const AuthenticationOptions(
             stickyAuth: true,
-            biometricOnly: true,
           ),
         );
         

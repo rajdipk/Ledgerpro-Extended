@@ -31,7 +31,8 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       setState(() {
         _isCameraAvailable = false;
-        _errorMessage = 'Camera scanning is not available on desktop. Please use manual entry or a USB barcode scanner.';
+        _errorMessage =
+            'Camera scanning is not available on desktop. Please use manual entry or a USB barcode scanner.';
       });
       return;
     }
@@ -70,7 +71,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
         const SizedBox(height: 24),
         TextField(
           controller: _manualController,
-          autofocus: true,  // Auto-focus for barcode scanner
+          autofocus: true, // Auto-focus for barcode scanner
           decoration: const InputDecoration(
             labelText: 'Barcode',
             hintText: 'Scan or type barcode',
@@ -97,76 +98,105 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
   }
 
   Future<void> _processBarcode(String barcode) async {
-    if (_isProcessing) return;
+    debugPrint('Processing barcode: $barcode');
+    if (_isProcessing) {
+      debugPrint('Already processing a barcode, skipping...');
+      return;
+    }
+
     setState(() => _isProcessing = true);
+    debugPrint('Started processing barcode...');
 
     try {
-      // Play a success sound
+      // Play beep sound
       await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
-      
-      // Process the barcode
-      final result = await _barcodeService.processBarcode(barcode);
+
+      final processedBarcode = await _barcodeService.processBarcode(barcode);
+      debugPrint('Processed barcode: $processedBarcode');
+
+      final productInfo =
+          await _barcodeService.getProductInfo(processedBarcode);
+      debugPrint('Retrieved product info: $productInfo');
+
       if (mounted) {
-        Navigator.of(context).pop(result);
+        debugPrint('Returning barcode result to dialog...');
+        Navigator.of(context).pop(processedBarcode);
+        debugPrint('Dialog closed with result');
+      } else {
+        debugPrint('Widget not mounted, cannot return result');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error processing barcode: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing barcode: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
       }
+      debugPrint('Finished processing barcode');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: 400,
-        height: 500,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Scan Barcode',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop && mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Dialog(
+        child: Container(
+          width: 400,
+          height: 500,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Scan Barcode',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                if (_isCameraAvailable && _controller != null)
+                  if (_isCameraAvailable && _controller != null)
+                    IconButton(
+                      icon: Icon(
+                          _torchEnabled ? Icons.flash_on : Icons.flash_off),
+                      onPressed: () {
+                        setState(() {
+                          _torchEnabled = !_torchEnabled;
+                          _controller?.toggleTorch();
+                        });
+                      },
+                    ),
                   IconButton(
-                    icon: Icon(_torchEnabled ? Icons.flash_on : Icons.flash_off),
+                    icon: const Icon(Icons.close),
                     onPressed: () {
-                      setState(() {
-                        _torchEnabled = !_torchEnabled;
-                        _controller?.toggleTorch();
-                      });
+                      if (mounted) {
+                        Future.microtask(() => Navigator.of(context).pop());
+                      }
                     },
                   ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Platform.isWindows || Platform.isLinux || Platform.isMacOS
-                  ? _buildDesktopBarcodeInput()
-                  : _buildMobileScanner(),
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child:
+                    Platform.isWindows || Platform.isLinux || Platform.isMacOS
+                        ? _buildDesktopBarcodeInput()
+                        : _buildMobileScanner(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -226,10 +256,14 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
 
   @override
   void dispose() {
-    if (_controller != null && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+    _audioPlayer.dispose();
+    if (_controller != null &&
+        !Platform.isWindows &&
+        !Platform.isLinux &&
+        !Platform.isMacOS) {
       _controller?.stop();
-      _controller?.dispose();
     }
+    _controller?.dispose();
     _manualController.dispose();
     super.dispose();
   }

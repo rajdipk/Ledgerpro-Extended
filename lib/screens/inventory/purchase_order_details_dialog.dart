@@ -1,6 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../database/supplier_operations.dart';
@@ -623,7 +624,10 @@ class _PurchaseOrderDetailsDialogState
                                               vertical: 8,
                                             ),
                                           ),
-                                          keyboardType: TextInputType.number,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.digitsOnly,
+                                          ],
                                           validator: (value) {
                                             if (value == null || value.isEmpty) {
                                               return 'Required';
@@ -806,7 +810,7 @@ class _PurchaseOrderDetailsDialogState
     if (status == 'draft') {
       return ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.teal,
+          backgroundColor: Colors.orange,
           foregroundColor: Colors.white,
         ),
         onPressed: () => _updateOrderStatus('pending'),
@@ -818,7 +822,7 @@ class _PurchaseOrderDetailsDialogState
     if (status == 'pending') {
       return ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.teal,
+          backgroundColor: Colors.red,
           foregroundColor: Colors.white,
         ),
         onPressed: () => _updateOrderStatus('confirmed'),

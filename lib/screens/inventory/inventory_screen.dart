@@ -345,12 +345,18 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Purchase Price: ${_formatPrice(item.costPrice, context)}',
+                              'Purchase Price: ${NumberFormat.currency(
+                                symbol: Provider.of<CurrencyProvider>(context).currencySymbol,
+                                decimalDigits: 2,
+                              ).format(item.costPrice)}',
                               style: TextStyle(color: Colors.grey[800]),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Avg. Cost: ${_formatPrice(item.weightedAverageCost, context)}',
+                              'Avg. Cost: ${NumberFormat.currency(
+                                symbol: Provider.of<CurrencyProvider>(context).currencySymbol,
+                                decimalDigits: 2,
+                              ).format(item.weightedAverageCost)}',
                               style: TextStyle(
                                 color: Colors.grey[800],
                                 fontStyle: FontStyle.italic,
@@ -358,7 +364,11 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Selling Price: ${_formatPrice(item.sellingPrice, context)}',
+                              'Selling Price:  ${NumberFormat.currency(
+                                symbol: Provider.of<CurrencyProvider>(context)
+                                    .currencySymbol,
+                                decimalDigits: 2,
+                              ).format(item.sellingPrice)}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w500,
                                 color: Colors.blue,
@@ -575,16 +585,19 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
   }
 
   Future<void> _scanBarcode() async {
-    final result = await showDialog(
+    if (!mounted) return;
+    
+    final String? scannedBarcode = await showDialog<String>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => const BarcodeScannerDialog(),
     );
 
-    if (result != null && result['barcode'] != null) {
+    if (scannedBarcode != null && mounted) {
       await _soundService.playBeep();
       setState(() {
-        _searchController.text = result['barcode'];
-        _searchQuery = result['barcode'].toLowerCase();
+        _searchController.text = scannedBarcode;
+        _searchQuery = scannedBarcode.toLowerCase();
       });
     }
   }

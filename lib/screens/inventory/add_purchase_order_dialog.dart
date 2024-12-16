@@ -1,6 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../providers/business_provider.dart';
@@ -11,6 +12,7 @@ import '../../models/inventory_item_model.dart';
 import '../../widgets/barcode_scanner_dialog.dart';
 import 'package:intl/intl.dart';
 import '../../dialogs/add_supplier_dialog.dart';
+import '../../providers/currency_provider.dart';
 
 class AddPurchaseOrderDialog extends StatefulWidget {
   const AddPurchaseOrderDialog({super.key});
@@ -52,96 +54,131 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Dialog(
-      backgroundColor: theme.colorScheme.surface,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 1200,
-          maxHeight: 900,
-        ),
-        child: Scaffold(
-          appBar: AppBar(
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            backgroundColor: Colors.teal,
-            foregroundColor: Colors.white,
-            title: const Text('Create Purchase Order'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          body: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth > 900;
-                final isMobile = constraints.maxWidth <= 600;
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    final isMediumScreen = screenSize.width >= 600 && screenSize.width < 900;
 
-                if (isDesktop) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildOrderInformationCard(theme),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(
-                        flex: 4,
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.all(24),
-                                child: _buildOrderItemsCard(theme),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isSmallScreen ? screenSize.width * 0.95 : 1200,
+          maxHeight: isSmallScreen ? screenSize.height * 0.95 : 900,
+        ),
+        child: Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Scaffold(
+            appBar: AppBar(
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+              title: const Text(
+                'Create Purchase Order',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            body: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (isSmallScreen) {
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildOrderInformationCard(context, isDesktop: false),
+                                  const SizedBox(height: 16),
+                                  _buildOrderItemsCard(context, isDesktop: false),
+                                ],
                               ),
                             ),
-                            if (_items.isNotEmpty)
-                              _buildTotalSection(theme),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                } else {
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.all(isMobile ? 16 : 24),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildOrderInformationCard(theme),
-                                SizedBox(height: isMobile ? 16 : 24),
-                                _buildOrderItemsCard(theme),
-                              ],
+                        if (_items.isNotEmpty)
+                          _buildTotalSection(context, isDesktop: false),
+                      ],
+                    );
+                  } else if (isMediumScreen) {
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildOrderInformationCard(context, isDesktop: false),
+                                  const SizedBox(height: 24),
+                                  _buildOrderItemsCard(context, isDesktop: false),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (_items.isNotEmpty)
-                        _buildTotalSection(theme),
-                    ],
-                  );
-                }
-              },
+                        if (_items.isNotEmpty)
+                          _buildTotalSection(context, isDesktop: true),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildOrderInformationCard(context, isDesktop: true),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          color: Colors.teal.withOpacity(0.2),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.all(24),
+                                  child: _buildOrderItemsCard(context, isDesktop: true),
+                                ),
+                              ),
+                              if (_items.isNotEmpty)
+                                _buildTotalSection(context, isDesktop: true),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                },
+              ),
             ),
           ),
         ),
@@ -149,13 +186,13 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
     );
   }
 
-  Widget _buildOrderInformationCard(ThemeData theme) {
+  Widget _buildOrderInformationCard(BuildContext context, {required bool isDesktop}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: theme.colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
         ),
       ),
       child: Padding(
@@ -165,13 +202,13 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
           children: [
             Row(
               children: [
-                Icon(Icons.receipt_long, color: theme.colorScheme.primary),
+                Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Order Information',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],
@@ -241,7 +278,7 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
     );
   }
 
-  Widget _buildOrderItemsCard(ThemeData theme) {
+  Widget _buildOrderItemsCard(BuildContext context, {required bool isDesktop}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -260,13 +297,13 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.shopping_cart, color: theme.colorScheme.primary),
+                        Icon(Icons.shopping_cart, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
                           'Order Items',
-                          style: theme.textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         const Spacer(),
@@ -320,20 +357,20 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
                       Icon(
                         Icons.inventory_2_outlined,
                         size: 48,
-                        color: theme.colorScheme.outline,
+                        color: Theme.of(context).colorScheme.outline,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No items added yet',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.outline,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Click "Add Item" to start adding items to your order',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.outline,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
                         ),
                       ),
                     ],
@@ -341,25 +378,25 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
                 ),
               )
             else
-              _buildItemsList(theme),
+              _buildItemsList(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildItemsList(ThemeData theme) {
+  Widget _buildItemsList(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
-        
+
         if (isMobile) {
           return ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _items.length,
             separatorBuilder: (context, index) => const Divider(),
-            itemBuilder: (context, index) => _buildMobileItemTile(index, theme),
+            itemBuilder: (context, index) => _buildMobileItemTile(index, context),
           );
         } else {
           return SingleChildScrollView(
@@ -380,7 +417,7 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
                 rows: _items.asMap().entries.map((entry) {
                   final index = entry.key;
                   final item = entry.value;
-                  return _buildDesktopItemRow(index, item, theme);
+                  return _buildDesktopItemRow(index, item, context);
                 }).toList(),
               ),
             ),
@@ -390,26 +427,42 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
     );
   }
 
-  DataRow _buildDesktopItemRow(int index, PurchaseOrderItem item, ThemeData theme) {
+  DataRow _buildDesktopItemRow(int index, PurchaseOrderItem item, BuildContext context) {
     final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
     final inventoryItem = inventoryProvider.getItemById(item.itemId);
-    
+
     return DataRow(
       cells: [
         DataCell(Text(inventoryItem?.name ?? 'Unknown')),
         DataCell(Text(inventoryItem?.sku ?? 'N/A')),
         DataCell(Text(item.quantity.toString())),
-        DataCell(Text(NumberFormat.currency(symbol: '\$').format(item.unitPrice))),
-        DataCell(Text(
-          NumberFormat.currency(symbol: '\$').format(item.totalPrice),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
+        DataCell(
+          Consumer<CurrencyProvider>(
+            builder: (context, currencyProvider, _) => Text(
+              NumberFormat.currency(
+                symbol: currencyProvider.currencySymbol,
+                decimalDigits: 2,
+              ).format(item.unitPrice),
+            ),
           ),
-        )),
+        ),
+        DataCell(
+          Consumer<CurrencyProvider>(
+            builder: (context, currencyProvider, _) => Text(
+              NumberFormat.currency(
+                symbol: currencyProvider.currencySymbol,
+                decimalDigits: 2,
+              ).format(item.totalPrice),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
         DataCell(
           IconButton(
-            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+            icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
             onPressed: () => setState(() => _items.removeAt(index)),
           ),
         ),
@@ -417,13 +470,13 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
     );
   }
 
-  Widget _buildMobileItemTile(int index, ThemeData theme) {
+  Widget _buildMobileItemTile(int index, BuildContext context) {
     final item = _items[index];
     return Consumer<InventoryProvider>(
       builder: (context, provider, _) {
         final inventoryItem = provider.getItemById(item.itemId);
         if (inventoryItem == null) return const SizedBox.shrink();
-        
+
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -431,7 +484,7 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
           ),
           title: Text(
             inventoryItem.name,
-            style: theme.textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,26 +492,33 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
               const SizedBox(height: 4),
               Text(
                 'SKU: ${inventoryItem.sku ?? 'N/A'}',
-                style: theme.textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              Text(
-                'Quantity: ${item.quantity} × ${NumberFormat.currency(symbol: '\$').format(item.unitPrice)}',
-                style: theme.textTheme.bodyMedium,
+              Consumer<CurrencyProvider>(
+                builder: (context, currencyProvider, _) => Text(
+                  'Quantity: ${item.quantity} × ${NumberFormat.currency(symbol: currencyProvider.currencySymbol, decimalDigits: 2).format(item.unitPrice)}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
             ],
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                NumberFormat.currency(symbol: '\$').format(item.totalPrice),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
+              Consumer<CurrencyProvider>(
+                builder: (context, currencyProvider, _) => Text(
+                  NumberFormat.currency(
+                    symbol: currencyProvider.currencySymbol,
+                    decimalDigits: 2,
+                  ).format(item.totalPrice),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
                 onPressed: () => setState(() => _items.removeAt(index)),
               ),
             ],
@@ -468,37 +528,64 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
     );
   }
 
-  Widget _buildTotalSection(ThemeData theme) {
+  Widget _buildTotalSection(BuildContext context, {required bool isDesktop}) {
+    final isMobile = MediaQuery.of(context).size.width <= 600;
+
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: Theme.of(context).cardColor,
         border: Border(
           top: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
+            color: Colors.teal.withOpacity(0.2),
           ),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isDesktop ? 24 : 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text(
-            'Total:',
-            style: theme.textTheme.titleLarge,
-          ),
-          const SizedBox(width: 16),
-          Text(
-            NumberFormat.currency(symbol: '\$').format(_calculateTotal()),
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
+          if (!isMobile) ...[
+            Text(
+              'Total:',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(width: 16),
+          ],
+          Consumer<CurrencyProvider>(
+            builder: (context, currencyProvider, _) => Text(
+              NumberFormat.currency(
+                symbol: currencyProvider.currencySymbol,
+                decimalDigits: 2,
+              ).format(_calculateTotal()),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Colors.teal,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          const SizedBox(width: 24),
+          SizedBox(width: isDesktop ? 24 : 16),
           FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 24 : 16,
+                vertical: 16,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             onPressed: _savePurchaseOrder,
             icon: const Icon(Icons.save),
-            label: const Text('Save Order'),
+            label: Text(isMobile ? 'Save' : 'Save Order'),
           ),
         ],
       ),
@@ -520,8 +607,19 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
-        border: const OutlineInputBorder(),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.teal),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.teal),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.teal, width: 2),
+        ),
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.teal) : null,
       ),
     );
   }
@@ -534,6 +632,16 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
           initialDate: _selectedDate,
           firstDate: DateTime.now(),
           lastDate: DateTime.now().add(const Duration(days: 365)),
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Colors.teal,
+                ),
+              ),
+              child: child!,
+            );
+          },
         );
         if (date != null) {
           setState(() {
@@ -542,10 +650,21 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
         }
       },
       child: InputDecorator(
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Order Date',
-          border: OutlineInputBorder(),
-          prefixIcon: Icon(Icons.calendar_today),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.teal),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.teal),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.teal, width: 2),
+          ),
+          prefixIcon: const Icon(Icons.calendar_today, color: Colors.teal),
         ),
         child: Text(
           DateFormat('MMM dd, yyyy').format(_selectedDate),
@@ -588,7 +707,6 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
                     decoration: const InputDecoration(
                       labelText: 'Select Supplier',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline),
                     ),
                     items: suppliers.map((supplier) {
                       return DropdownMenuItem<Supplier>(
@@ -602,9 +720,9 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
                       }
                       return null;
                     },
-                    onChanged: (Supplier? value) {
+                    onChanged: (Supplier? newValue) {
                       setState(() {
-                        _selectedSupplier = value;
+                        _selectedSupplier = newValue;
                       });
                     },
                   );
@@ -613,22 +731,36 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
             },
           ),
         ),
-        const SizedBox(width: 8),
-        IconButton.filledTonal(
+        const SizedBox(width: 16),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.teal,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
           onPressed: () async {
-            final businessId = int.parse(
-              Provider.of<BusinessProvider>(context, listen: false)
-                  .selectedBusinessId ?? '0',
-            );
-            final result = await showDialog(
+            final businessId = Provider.of<BusinessProvider>(context, listen: false)
+                .selectedBusinessId;
+            if (businessId == null) return;
+
+            final supplier = await showDialog<Supplier>(
               context: context,
-              builder: (context) => AddSupplierDialog(businessId: businessId),
+              builder: (context) => AddSupplierDialog(
+                businessId: int.parse(businessId),
+              ),
             );
-            if (result == true) {
-              setState(() {}); // Refresh the supplier list
+
+            if (supplier != null) {
+              setState(() {
+                _selectedSupplier = supplier;
+              });
             }
           },
           icon: const Icon(Icons.add),
+          label: const Text('Add Supplier'),
         ),
       ],
     );
@@ -644,7 +776,7 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
       if (result != null) {
         final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
         final items = inventoryProvider.items;
-        
+
         final item = items.firstWhere(
           (item) => item.barcode == result || item.sku == result,
           orElse: () {
@@ -654,7 +786,7 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
             return throw Exception('Item not found');
           },
         );
-        
+
         _showAddItemDialog(preSelectedItem: item);
       }
     } catch (e) {
@@ -788,7 +920,7 @@ class _AddOrderItemDialogState extends State<_AddOrderItemDialog> {
         final nameLower = item.name.toLowerCase();
         final skuLower = (item.sku ?? '').toLowerCase();
         final barcodeLower = (item.barcode ?? '').toLowerCase();
-        
+
         return nameLower.contains(searchLower) ||
                skuLower.contains(searchLower) ||
                barcodeLower.contains(searchLower);
@@ -798,136 +930,296 @@ class _AddOrderItemDialogState extends State<_AddOrderItemDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.add_shopping_cart, color: Colors.teal),
-          SizedBox(width: 8),
-          Text(
-            'Add Order Item',
-            style: TextStyle(
-              color: Colors.teal,
-              fontWeight: FontWeight.bold,
-            ),
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isSmallScreen ? screenSize.width * 0.95 : 600,
+          maxHeight: isSmallScreen ? screenSize.height * 0.95 : 700,
+        ),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
-      ),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Search Items',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.qr_code_scanner),
-                  onPressed: () async {
-                    final result = await showDialog<String>(
-                      context: context,
-                      builder: (context) => const BarcodeScannerDialog(),
-                    );
-                    if (result != null) {
-                      _searchController.text = result;
-                      _updateFilteredItems(result);
-                    }
-                  },
-                ),
-              ),
-              onChanged: _updateFilteredItems,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<InventoryItem>(
-              decoration: const InputDecoration(
-                labelText: 'Select Item',
-                border: OutlineInputBorder(),
-              ),
-              value: _selectedItem,
-              items: _filteredItems.map((item) {
-                return DropdownMenuItem(
-                  value: item,
-                  child: Text('${item.name} (${item.sku ?? 'No SKU'})'),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedItem = value;
-                  if (value != null) {
-                    _unitPriceController.text = value.costPrice.toString();
-                  }
-                });
-              },
-              validator: (value) {
-                if (value == null) {
-                  return 'Please select an item';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _quantityController,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.numbers),
+                Row(
+                  children: [
+                    const Icon(Icons.add_shopping_cart, color: Colors.teal, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add Order Item',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Colors.teal,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (!isSmallScreen) const SizedBox(height: 4),
+                          if (!isSmallScreen)
+                            Text(
+                              'Add items to your purchase order',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a quantity';
-                      }
-                      final quantity = int.tryParse(value);
-                      if (quantity == null || quantity <= 0) {
-                        return 'Please enter a valid quantity';
-                      }
-                      return null;
-                    },
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              labelText: 'Search Items',
+                              hintText: 'Search by name, SKU, or barcode',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.qr_code_scanner),
+                                onPressed: () async {
+                                  final result = await showDialog<String>(
+                                    context: context,
+                                    builder: (context) => const BarcodeScannerDialog(),
+                                  );
+                                  if (result != null) {
+                                    _searchController.text = result;
+                                    _updateFilteredItems(result);
+                                  }
+                                },
+                              ),
+                            ),
+                            onChanged: _updateFilteredItems,
+                          ),
+                          const SizedBox(height: 24),
+                          DropdownButtonFormField<InventoryItem>(
+                            decoration: const InputDecoration(
+                              labelText: 'Select Item',
+                              border: OutlineInputBorder(),
+                            ),
+                            value: _selectedItem,
+                            items: _filteredItems.map((item) {
+                              return DropdownMenuItem(
+                                value: item,
+                                child: Text('${item.name} (${item.sku ?? 'No SKU'})'),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedItem = value;
+                                if (value != null) {
+                                  _unitPriceController.text = value.costPrice.toString();
+                                }
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select an item';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _quantityController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Quantity',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.numbers),
+                                  ),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter a quantity';
+                                    }
+                                    final quantity = int.tryParse(value);
+                                    if (quantity == null || quantity <= 0) {
+                                      return 'Please enter a valid quantity';
+                                    }
+                                    return null;
+                                  },
+                                  onChanged: (value) {
+                                    setState(() {}); // Trigger rebuild for total price
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Consumer<CurrencyProvider>(
+                                  builder: (context, currencyProvider, _) {
+                                    return TextFormField(
+                                      controller: _unitPriceController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Unit Price',
+                                        border: const OutlineInputBorder(),
+                                        prefixText: currencyProvider.currencySymbol,
+                                        prefixStyle: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      validator: (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return 'Please enter a unit price';
+                                        }
+                                        if (double.tryParse(value) == null) {
+                                          return 'Please enter a valid number';
+                                        }
+                                        return null;
+                                      },
+                                      onChanged: (value) {
+                                        setState(() {}); // Trigger rebuild for total price
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Consumer<CurrencyProvider>(
+                            builder: (context, currencyProvider, _) {
+                              final quantity = int.tryParse(_quantityController.text) ?? 0;
+                              final unitPrice = double.tryParse(_unitPriceController.text) ?? 0.0;
+                              final total = quantity * unitPrice;
+
+                              return Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.teal.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Quantity:',
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        ),
+                                        Text(
+                                          quantity.toString(),
+                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Unit Price:',
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        ),
+                                        Text(
+                                          NumberFormat.currency(
+                                            symbol: currencyProvider.currencySymbol,
+                                            decimalDigits: 2,
+                                          ).format(unitPrice),
+                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 8),
+                                      child: Divider(),
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Total:',
+                                          style: Theme.of(context).textTheme.titleLarge,
+                                        ),
+                                        Text(
+                                          NumberFormat.currency(
+                                            symbol: currencyProvider.currencySymbol,
+                                            decimalDigits: 2,
+                                          ).format(total),
+                                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.teal,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _unitPriceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit Price',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      label: const Text('Cancel'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey,
+                      ),
                     ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a unit price';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      return null;
-                    },
-                  ),
+                    const SizedBox(width: 12),
+                    FilledButton.icon(
+                      onPressed: _addItem,
+                      icon: const Icon(Icons.add_shopping_cart),
+                      label: const Text('Add to Order'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          child: const Text('Cancel'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        FilledButton.icon(
-          onPressed: _addItem,
-          icon: const Icon(Icons.add),
-          label: const Text('Add Item'),
-        ),
-      ],
     );
   }
 
@@ -939,7 +1231,7 @@ class _AddOrderItemDialogState extends State<_AddOrderItemDialog> {
 
     final quantity = int.tryParse(_quantityController.text);
     final unitPrice = double.tryParse(_unitPriceController.text);
-    
+
     if (quantity == null || unitPrice == null) return;
 
     final newItem = PurchaseOrderItem(

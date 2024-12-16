@@ -15,14 +15,16 @@ class AuthenticationScreen extends StatefulWidget {
   _AuthenticationScreenState createState() => _AuthenticationScreenState();
 }
 
-class _AuthenticationScreenState extends State<AuthenticationScreen> with SingleTickerProviderStateMixin {
+class _AuthenticationScreenState extends State<AuthenticationScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final FocusNode _passwordFocusNode = FocusNode();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _rememberMe = false;
-  bool _acceptedTerms = true;  
+  bool _acceptedTerms = true;
   int _failedAttempts = 0;
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool _canCheckBiometrics = false;
@@ -32,7 +34,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
   void initState() {
     super.initState();
     _checkBiometrics();
-    
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -129,7 +131,8 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
                               child: FutureBuilder<bool>(
                                 future: DatabaseHelper.instance.isPasswordSet(),
                                 builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
                                     return _buildShimmerLoading();
                                   } else if (snapshot.hasError) {
                                     return Text('Error: ${snapshot.error}');
@@ -140,7 +143,8 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
                                   }
                                 },
                               ),
-                            ).animate()
+                            )
+                                .animate()
                                 .fadeIn(delay: 600.ms)
                                 .slide(begin: const Offset(0, 0.2)),
                             if (_canCheckBiometrics) ...[
@@ -200,7 +204,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
       ),
     );
   }
-
 
   Widget _buildShimmerLoading() {
     return Shimmer.fromColors(
@@ -289,7 +292,8 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          color: _passwordFocusNode.hasFocus ? Colors.black87 : Colors.grey[600],
+          color:
+              _passwordFocusNode.hasFocus ? Colors.black87 : Colors.grey[600],
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15.0),
@@ -306,14 +310,13 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
             _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
             color: Colors.grey[600],
           ),
-          onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+          onPressed: () =>
+              setState(() => _isPasswordVisible = !_isPasswordVisible),
         ),
       ),
       textInputAction: TextInputAction.done,
       onFieldSubmitted: (_) => _authenticate(),
-    ).animate()
-        .fadeIn(delay: 200.ms)
-        .slideX(begin: 0.2, delay: 200.ms);
+    ).animate().fadeIn(delay: 200.ms).slideX(begin: 0.2, delay: 200.ms);
   }
 
   Widget _buildRememberMeRow() {
@@ -348,8 +351,10 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
 
   Widget _buildTermsAndConditionsRow() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Transform.scale(
               scale: 0.9,
@@ -364,10 +369,12 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
             ),
             Expanded(
               child: Wrap(
-                alignment: WrapAlignment.start,
+                spacing: 2,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Text(
-                    'I agree to the ',
+                    'I agree to the',
                     style: TextStyle(fontSize: 14),
                   ),
                   InkWell(
@@ -377,17 +384,20 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
                         builder: (context) => const TermsAndConditionsScreen(),
                       ),
                     ),
-                    child: const Text(
-                      'Terms & Conditions',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                        //decoration: TextDecoration.underline,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'Terms & Conditions',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ),
                   const Text(
-                    ' and ',
+                    'and',
                     style: TextStyle(fontSize: 14),
                   ),
                   InkWell(
@@ -397,12 +407,15 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
                         builder: (context) => const EULAScreen(),
                       ),
                     ),
-                    child: const Text(
-                      'EULA',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                        //decoration: TextDecoration.underline,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'EULA',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ),
@@ -412,9 +425,7 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
           ],
         ),
       ],
-    ).animate()
-        .fadeIn(delay: 300.ms)
-        .slideX(begin: 0.2, delay: 300.ms);
+    ).animate().fadeIn(delay: 300.ms).slideX(begin: 0.2, delay: 300.ms);
   }
 
   Widget _buildAuthButton() {
@@ -449,14 +460,13 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
                 ),
               ),
       ),
-    ).animate()
-        .fadeIn(delay: 400.ms)
-        .scale(delay: 400.ms);
+    ).animate().fadeIn(delay: 400.ms).scale(delay: 400.ms);
   }
 
   Future<void> _checkBiometrics() async {
     try {
-      final bool canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
+      final bool canAuthenticateWithBiometrics =
+          await _localAuth.canCheckBiometrics;
       final bool canAuthenticate = await _localAuth.isDeviceSupported();
       setState(() {
         _canCheckBiometrics = canAuthenticateWithBiometrics && canAuthenticate;
@@ -471,7 +481,8 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
   Future<bool> _authenticateWithBiometrics() async {
     bool authenticated = false;
     try {
-      final bool canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
+      final bool canAuthenticateWithBiometrics =
+          await _localAuth.canCheckBiometrics;
       final bool canAuthenticate = await _localAuth.isDeviceSupported();
 
       if (canAuthenticateWithBiometrics && canAuthenticate) {
@@ -479,19 +490,20 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
           localizedReason: 'Authenticate to access LedgerPro',
           options: const AuthenticationOptions(
             stickyAuth: true,
-            biometricOnly: true,
           ),
         );
-        
+
         if (authenticated) {
           // Check if password is set in database before proceeding
-          final bool isPasswordSet = await DatabaseHelper.instance.isPasswordSet();
+          final bool isPasswordSet =
+              await DatabaseHelper.instance.isPasswordSet();
           if (!isPasswordSet) {
             authenticated = false;
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Please set up a password first before using biometric login'),
+                  content: Text(
+                      'Please set up a password first before using biometric login'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -515,21 +527,23 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
 
   Widget _buildBiometricButton() {
     return TextButton.icon(
-      onPressed: _isLoading ? null : () async {
-        setState(() => _isLoading = true);
-        try {
-          if (await _authenticateWithBiometrics()) {
-            if (mounted) {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
-          }
-        } finally {
-          if (mounted) {
-            setState(() => _isLoading = false);
-          }
-        }
-      },
-      icon: _isLoading 
+      onPressed: _isLoading
+          ? null
+          : () async {
+              setState(() => _isLoading = true);
+              try {
+                if (await _authenticateWithBiometrics()) {
+                  if (mounted) {
+                    Navigator.pushReplacementNamed(context, '/home');
+                  }
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                }
+              }
+            },
+      icon: _isLoading
           ? const SizedBox(
               width: 24,
               height: 24,
@@ -555,7 +569,8 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
     if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please accept the Terms & Conditions and EULA to continue'),
+          content:
+              Text('Please accept the Terms & Conditions and EULA to continue'),
           backgroundColor: Colors.red,
         ),
       );
@@ -580,7 +595,8 @@ class _AuthenticationScreenState extends State<AuthenticationScreen> with Single
           Navigator.pushReplacementNamed(context, '/home');
         } else {
           _failedAttempts++;
-          _showErrorDialog('Invalid password. ${3 - _failedAttempts} attempts remaining.');
+          _showErrorDialog(
+              'Invalid password. ${3 - _failedAttempts} attempts remaining.');
         }
       } else {
         String? confirmPassword = _confirmPasswordController.text.trim();

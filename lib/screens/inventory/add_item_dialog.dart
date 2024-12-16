@@ -326,25 +326,40 @@ class _AddItemDialogState extends State<AddItemDialog> {
       );
     }
   }
-
+  
   void _scanBarcode() async {
-    final result = await showDialog(
-      context: context,
-      builder: (context) => const BarcodeScannerDialog(),
-    );
+    debugPrint('Starting barcode scan...');
+    try {
+      debugPrint('Opening BarcodeScannerDialog...');
+      final String? result = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          debugPrint('Building BarcodeScannerDialog...');
+          return const BarcodeScannerDialog();
+        },
+      );
 
-    if (result != null) {
-      setState(() {
-        _barcodeController.text = result['barcode'];
-        if (result['productInfo'] != null) {
-          _nameController.text = result['productInfo']['title'] ?? '';
-          _descriptionController.text = result['productInfo']['description'] ?? '';
-          // You can add more fields like category, brand, etc.
-        }
-      });
+      debugPrint('Barcode scan result: $result');
+
+      if (result != null && mounted) {
+        debugPrint('Setting barcode: $result');
+        setState(() {
+          _barcodeController.text = result;
+        });
+      } else {
+        debugPrint('No barcode result received or widget not mounted');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in _scanBarcode: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error scanning barcode: $e')),
+        );
+      }
     }
   }
-
+    
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -387,11 +402,11 @@ class _AddItemDialogState extends State<AddItemDialog> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-                    onPressed: _scanBarcode,
-                    tooltip: 'Scan Barcode',
-                  ),
+                  // IconButton(
+                  //   icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                  //   onPressed: _scanBarcode,
+                  //   tooltip: 'Scan Barcode',
+                  // ),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
@@ -427,6 +442,24 @@ class _AddItemDialogState extends State<AddItemDialog> {
                       const SizedBox(height: 16),
 
                       _buildSectionTitle('Classification'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextFormField(
+                              'Barcode',
+                              _barcodeController,
+                              keyboardType: TextInputType.text,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            onPressed: _scanBarcode,
+                            tooltip: 'Scan Barcode',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       _buildTextFormField(
                         'Category',
                         _categoryController,
@@ -500,10 +533,6 @@ class _AddItemDialogState extends State<AddItemDialog> {
                         spacing: 16,
                         runSpacing: 16,
                         children: [
-                          SizedBox(
-                            width: isSmallScreen ? double.infinity : (dialogWidth - contentPadding * 3) / 2,
-                            child: _buildTextFormField('Barcode', _barcodeController),
-                          ),
                           SizedBox(
                             width: isSmallScreen ? double.infinity : (dialogWidth - contentPadding * 3) / 2,
                             child: _buildUnitField(),

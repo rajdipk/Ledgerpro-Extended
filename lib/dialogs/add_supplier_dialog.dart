@@ -175,15 +175,6 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                             UpperCaseTextFormatter(),
                             LengthLimitingTextInputFormatter(15),
                           ],
-                          validator: (value) {
-                            if (value != null && value.isNotEmpty) {
-                              if (!RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d[Z]{1}[A-Z\d]{1}$')
-                                  .hasMatch(value)) {
-                                return 'Invalid GST number format';
-                              }
-                            }
-                            return null;
-                          },
                           textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 16),

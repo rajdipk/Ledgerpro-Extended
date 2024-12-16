@@ -1,6 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../providers/business_provider.dart';
@@ -65,7 +66,7 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
           maxHeight: isSmallScreen ? screenSize.height * 0.95 : 900,
         ),
         child: Card(
-          clipBehavior: Clip.antiAlias,
+          elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -703,21 +704,9 @@ class _AddPurchaseOrderDialogState extends State<AddPurchaseOrderDialog> {
 
                   return DropdownButtonFormField<Supplier>(
                     value: _selectedSupplier,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Select Supplier',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.teal),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.teal),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.teal, width: 2),
-                      ),
-                      prefixIcon: const Icon(Icons.person_outline, color: Colors.teal),
+                      border: OutlineInputBorder(),
                     ),
                     items: suppliers.map((supplier) {
                       return DropdownMenuItem<Supplier>(
@@ -1064,7 +1053,10 @@ class _AddOrderItemDialogState extends State<_AddOrderItemDialog> {
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.numbers),
                                   ),
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'Please enter a quantity';

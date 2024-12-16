@@ -6,6 +6,28 @@
 
 This is the extended version of LedgerPro with advanced features and complete implementation of inventory management, accounting, and business operations. This repository contains proprietary features and improvements.
 
+## Latest Updates (v2.0.0)
+
+### Authentication Improvements
+- Enhanced password field functionality
+- Improved focus management
+- Responsive design across different screen sizes
+- Fixed screen refresh issues
+
+### Inventory Management Enhancements
+- **Improved Purchase Order System**:
+  - Fixed quantity input in purchase orders
+  - Enhanced barcode scanning with audio feedback
+  - Updated order status indicators with new color scheme
+  - Improved receive items functionality
+  - Real-time quantity validation
+
+- **Barcode Scanner Improvements**:
+  - Added audio feedback (beep sound) on successful scans
+  - Better error handling and user feedback
+  - Support for both camera and USB barcode scanners
+  - Improved desktop mode support
+
 ## Extended Features
 
 ### Inventory Management
@@ -18,7 +40,7 @@ This is the extended version of LedgerPro with advanced features and complete im
   
 - **Purchase Order System**:
   - Create and manage purchase orders
-  - Track order status
+  - Track order status with visual indicators
   - Supplier integration
   - Automatic stock updates
   - Order history and analytics
@@ -100,8 +122,4 @@ This is a private repository. Please follow these guidelines:
 
 ## License & Confidentiality
 
-This is proprietary software. All rights reserved. Unauthorized copying, distribution, or use is strictly prohibited.
-
-## Contact
-
-For access or questions, contact the repository owner.
+This software is proprietary and confidential. Unauthorized copying, distribution, or use is strictly prohibited.

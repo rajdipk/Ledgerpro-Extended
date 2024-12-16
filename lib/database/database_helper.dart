@@ -1794,4 +1794,25 @@ CREATE TABLE supplier_balances (
     );
     return List.generate(maps.length, (i) => InventoryBatch.fromMap(maps[i]));
   }
+
+  // Update purchase order item
+  Future<int> updatePurchaseOrderItem(PurchaseOrderItem item) async {
+    final db = await database;
+    return await db.update(
+      'purchase_order_items',
+      item.toMap(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  // Delete purchase order item
+  Future<int> deletePurchaseOrderItem(int itemId) async {
+    final db = await database;
+    return await db.delete(
+      'purchase_order_items',
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+  }
 }

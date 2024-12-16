@@ -28,9 +28,16 @@ class _StockMovementsScreenState extends State<StockMovementsScreen> {
     super.dispose();
   }
 
-  String _formatPrice(double price, BuildContext context) {
-    final currencyProvider = Provider.of<CurrencyProvider>(context);
-    return '${currencyProvider.currencySymbol} ${price.toStringAsFixed(2)}';
+  Widget _formatPrice(double price, BuildContext context) {
+    return Consumer<CurrencyProvider>(
+      builder: (context, currencyProvider, _) => Text(
+        NumberFormat.currency(
+          symbol: currencyProvider.currencySymbol,
+          decimalDigits: 2,
+        ).format(price),
+        style: const TextStyle(fontSize: 14),
+      ),
+    );
   }
 
   Widget _buildFilterSection() {
@@ -208,10 +215,7 @@ class _StockMovementsScreenState extends State<StockMovementsScreen> {
                       : Colors.red[700],
                   ),
                 ),
-                Text(
-                  'Unit Price: ${_formatPrice(movement.unitPrice, context)}',
-                  style: const TextStyle(fontSize: 14),
-                ),
+                _formatPrice(movement.unitPrice, context),
               ],
             ),
             const SizedBox(height: 4),

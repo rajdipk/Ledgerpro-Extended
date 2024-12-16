@@ -2,13 +2,17 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../database/supplier_operations.dart';
+import '../../models/business_model.dart';
 import '../../models/purchase_order_model.dart';
-import '../../providers/inventory_provider.dart';
 import '../../providers/business_provider.dart';
+import '../../providers/inventory_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../models/inventory_item_model.dart';
+import '../../services/pdf_service.dart';
 import 'package:intl/intl.dart';
 import 'add_item_dialog.dart';
 
@@ -81,6 +85,11 @@ class _PurchaseOrderDetailsDialogState
             foregroundColor: Colors.white,
             title: const Text('Purchase Order Details'),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.print),
+                tooltip: 'Print Order',
+                onPressed: _printPurchaseOrder,
+              ),
               if (widget.order.status.toLowerCase() == 'pending')
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
@@ -1219,5 +1228,48 @@ class _PurchaseOrderDetailsDialogState
         ],
       ),
     );
+  }
+
+  Future<void> _printPurchaseOrder() async {
+    try {
+      final businessProvider = Provider.of<BusinessProvider>(context, listen: false);
+      final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
+      final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+      
+      // Get all items for the order
+      final items = widget.order.items.map((orderItem) {
+        return inventoryProvider.getItemById(orderItem.itemId);
+      }).whereType<InventoryItem>().toList();
+
+      final selectedBusinessName = businessProvider.businesses
+          .firstWhere(
+            (business) => business.id == businessProvider.selectedBusinessId,
+            orElse: () => Business(id: '', name: 'Business Name'),
+          )
+          .name;
+
+      final pdfBytes = await PdfService.generatePurchaseOrderPdf(
+        order: widget.order,
+        supplier: businessProvider.selectedSupplier!,
+        items: items,
+        businessName: selectedBusinessName,
+        currency: currencyProvider.currencyCode,
+      );
+
+      if (!mounted) return;
+
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'Purchase Order ${widget.order.orderNumber}.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error generating PDF: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

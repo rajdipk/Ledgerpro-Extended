@@ -284,7 +284,7 @@ class _NavigationPanelState extends State<NavigationPanel> {
   void _showAddBusinessDialog(BuildContext context) async {
     final newBusinessId = await showDialog<String>(
       context: context,
-      builder: (context) => AddBusinessDialog(),
+      builder: (context) => const AddBusinessDialog(),
     );
 
     if (newBusinessId != null && newBusinessId.isNotEmpty) {

@@ -100,7 +100,18 @@ CREATE TABLE user_password (
     await db.execute('''
 CREATE TABLE businesses (
   id $idType,
-  name $textType
+  name $textType,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  gstin TEXT,
+  pan TEXT,
+  business_type TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  logo TEXT,
+  default_currency TEXT,
+  settings TEXT
 );
 ''');
     // Create customers table
@@ -269,119 +280,36 @@ CREATE TABLE supplier_balances (
   Future<void> _onUpgrade(
       sqflite.Database db, int oldVersion, int newVersion) async {
     debugPrint('Upgrading database from version $oldVersion to $newVersion');
-
-    try {
-      if (oldVersion < 4) {
-        // Drop existing inventory tables if they exist
-        await db.execute('DROP TABLE IF EXISTS stock_movements');
-        await db.execute('DROP TABLE IF EXISTS purchase_order_items');
-        await db.execute('DROP TABLE IF EXISTS purchase_orders');
-        await db.execute('DROP TABLE IF EXISTS inventory_items');
-
-        // Create inventory items table with updated schema
+    
+    if (oldVersion < 6) {
+      try {
+        // Drop and recreate the businesses table
+        await db.execute('DROP TABLE IF EXISTS businesses');
+        
+        // Create the new businesses table with all columns
         await db.execute('''
-          CREATE TABLE inventory_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            sku TEXT DEFAULT '',
-            barcode TEXT DEFAULT '',
-            category TEXT DEFAULT '',
-            unit TEXT NOT NULL,
-            selling_price REAL NOT NULL, 
-            cost_price REAL NOT NULL,
-            weighted_average_cost REAL NOT NULL,
-            current_stock INTEGER NOT NULL DEFAULT 0,
-            reorder_level INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (business_id) REFERENCES businesses(id)
-          )
-        ''');
-
-        // Create inventory batches table
-        await db.execute('''
-          CREATE TABLE inventory_batches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL,
-            cost_price REAL NOT NULL,
-            purchase_date TEXT NOT NULL,
-            reference_type TEXT,
-            reference_id INTEGER,
-            FOREIGN KEY (item_id) REFERENCES inventory_items(id)
-          )
-        ''');
-
-        // Create stock movements table
-        await db.execute('''
-          CREATE TABLE stock_movements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id INTEGER NOT NULL,
-            item_id INTEGER NOT NULL,
-            movement_type TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            unit_price REAL NOT NULL,
-            total_price REAL NOT NULL,
-            reference_type TEXT DEFAULT '',
-            reference_id INTEGER,
-            notes TEXT DEFAULT '',
-            date TEXT NOT NULL,
-            FOREIGN KEY (business_id) REFERENCES businesses(id),
-            FOREIGN KEY (item_id) REFERENCES inventory_items(id)
-          )
-        ''');
-
-        // Create purchase orders table
-        await db.execute('''
-          CREATE TABLE purchase_orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id INTEGER NOT NULL,
-            supplier_id INTEGER NOT NULL,
-            order_number TEXT NOT NULL,
-            status TEXT NOT NULL,
-            total_amount REAL NOT NULL,
-            notes TEXT DEFAULT '',
-            order_date TEXT NOT NULL,
-            expected_date TEXT,
-            received_date TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (business_id) REFERENCES businesses(id),
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-          )
-        ''');
-
-        // Create purchase order items table
-        await db.execute('''
-          CREATE TABLE purchase_order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            purchase_order_id INTEGER NOT NULL,
-            item_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL,
-            unit_price REAL NOT NULL,
-            total_price REAL NOT NULL,
-            received_quantity INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
-            FOREIGN KEY (item_id) REFERENCES inventory_items(id)
-          )
-        ''');
-      } else if (oldVersion < 5) {
-        // Add new columns to transactions table
-        await db.execute('''
-          ALTER TABLE transactions ADD COLUMN notes TEXT;
-        ''');
-        await db.execute('''
-          ALTER TABLE transactions ADD COLUMN reference_type TEXT;
-        ''');
-        await db.execute('''
-          ALTER TABLE transactions ADD COLUMN reference_id INTEGER;
-        ''');
+CREATE TABLE businesses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  gstin TEXT,
+  pan TEXT,
+  business_type TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  logo TEXT,
+  default_currency TEXT,
+  settings TEXT
+)
+''');
+        debugPrint('Successfully recreated businesses table');
+      } catch (e, stackTrace) {
+        debugPrint('Error upgrading database: $e');
+        debugPrint('Stack trace: $stackTrace');
+        rethrow;
       }
-    } catch (e) {
-      debugPrint('Error during database upgrade: $e');
-      rethrow;
     }
   }
 
@@ -426,14 +354,26 @@ CREATE TABLE supplier_balances (
   }
 
   // Add a business to the database
-  Future<int> addBusiness(String name) async {
-    final db = await database;
-    int id = await db.insert(
-      'businesses',
-      {'name': name},
-      conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
-    );
-    return id;
+  Future<int> addBusiness(Map<String, dynamic> business) async {
+    try {
+      debugPrint('Adding business with data: $business');
+      final db = await database;
+      
+      // Remove empty id from the map
+      business.remove('id');
+      
+      final id = await db.insert(
+        'businesses',
+        business,
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+      );
+      debugPrint('Business added successfully with ID: $id');
+      return id;
+    } catch (e, stackTrace) {
+      debugPrint('Error in addBusiness: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   // Retrieve all businesses

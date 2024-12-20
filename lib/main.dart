@@ -15,8 +15,10 @@ import 'providers/business_provider.dart';
 import 'providers/currency_provider.dart'; 
 import 'providers/theme_provider.dart';
 import 'providers/inventory_provider.dart';
+import 'providers/bill_provider.dart';
 import 'screens/settings.dart';
 import 'mannuals/user_manual_screen.dart';
+import 'screens/billing/billing_screen.dart';
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -66,6 +68,7 @@ Future<void> main() async {
             ChangeNotifierProvider(create: (_) => BusinessProvider()), 
             ChangeNotifierProvider(create: (_) => CurrencyProvider()),
             ChangeNotifierProvider(create: (_) => InventoryProvider()),
+            ChangeNotifierProvider(create: (_) => BillProvider()),
           ],
           child: const MyApp(),
         ),
@@ -166,6 +169,19 @@ class MyApp extends StatelessWidget {
                   },
                   transitionDuration: const Duration(milliseconds: 800),
                 );
+              case '/billing':
+                return PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) => const BillingScreen(),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    const begin = Offset(1.0, 0.0);
+                    const end = Offset.zero;
+                    const curve = Curves.easeInOutCubic;
+                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                    var offsetAnimation = animation.drive(tween);
+                    return SlideTransition(position: offsetAnimation, child: child);
+                  },
+                  transitionDuration: const Duration(milliseconds: 800),
+                );
               default:
                 return MaterialPageRoute(builder: (_) => AuthenticationScreen());
             }
@@ -175,6 +191,7 @@ class MyApp extends StatelessWidget {
             '/home': (context) => HomeScreen(),
             '/settings': (context) => const SettingsScreen(),
             '/user-manual': (context) => const UserManualScreen(),
+            '/billing': (context) => const BillingScreen(),
           },
           builder: (context, child) {
             return ScrollConfiguration(

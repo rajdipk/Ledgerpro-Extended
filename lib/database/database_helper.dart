@@ -77,7 +77,7 @@ class DatabaseHelper {
     // Version set to 1 initially, can be increased for future upgrades
     return await sqflite.openDatabase(
       path,
-      version: 6,  // Increased from 5 to 6
+      version: 7,  // Increased from 6 to 7
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -275,6 +275,40 @@ CREATE TABLE supplier_balances (
         FOREIGN KEY (item_id) REFERENCES inventory_items(id)
       );
     ''');
+
+    // Create bills table
+    await db.execute('''
+CREATE TABLE bills (
+  id $idType,
+  business_id INTEGER NOT NULL,
+  customer_id INTEGER NOT NULL,
+  sub_total REAL NOT NULL,
+  gst_amount REAL NOT NULL,
+  discount REAL NOT NULL,
+  total REAL NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  paid_at TEXT,
+  notes TEXT,
+  FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE,
+  FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+)
+''');
+
+    // Create bill_items table
+    await db.execute('''
+CREATE TABLE bill_items (
+  id $idType,
+  bill_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  price REAL NOT NULL,
+  gst_rate REAL NOT NULL,
+  notes TEXT,
+  FOREIGN KEY (bill_id) REFERENCES bills (id) ON DELETE CASCADE,
+  FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
+)
+''');
   }
 
   Future<void> _onUpgrade(
@@ -310,6 +344,41 @@ CREATE TABLE businesses (
         debugPrint('Stack trace: $stackTrace');
         rethrow;
       }
+    }
+
+    if (oldVersion < 7) {
+      // Create bills and bill_items tables
+      await db.execute('''
+CREATE TABLE bills (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_id INTEGER NOT NULL,
+  customer_id INTEGER NOT NULL,
+  sub_total REAL NOT NULL,
+  gst_amount REAL NOT NULL,
+  discount REAL NOT NULL,
+  total REAL NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  paid_at TEXT,
+  notes TEXT,
+  FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE,
+  FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+)
+''');
+
+      await db.execute('''
+CREATE TABLE bill_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  price REAL NOT NULL,
+  gst_rate REAL NOT NULL,
+  notes TEXT,
+  FOREIGN KEY (bill_id) REFERENCES bills (id) ON DELETE CASCADE,
+  FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
+)
+''');
     }
   }
 
@@ -461,6 +530,21 @@ CREATE TABLE businesses (
       'purchase_order_items',
       where:
           'purchase_order_id IN (SELECT id FROM purchase_orders WHERE business_id = ?)',
+      whereArgs: [id],
+    );
+
+    // Delete all bills for the business
+    await db.delete(
+      'bills',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all bill items for the business
+    await db.delete(
+      'bill_items',
+      where:
+          'bill_id IN (SELECT id FROM bills WHERE business_id = ?)',
       whereArgs: [id],
     );
 
@@ -1222,6 +1306,17 @@ CREATE TABLE businesses (
         throw Exception('Cannot delete item with existing purchase orders');
       }
 
+      // Check if there are any related bill items
+      final billItems = await txn.query(
+        'bill_items',
+        where: 'item_id = ?',
+        whereArgs: [id],
+      );
+
+      if (billItems.isNotEmpty) {
+        throw Exception('Cannot delete item with existing bills');
+      }
+
       // If no related records exist, delete the item
       await txn.delete(
         'inventory_items',
@@ -1441,11 +1536,237 @@ CREATE TABLE businesses (
       {
         'status': status,
         'updated_at': DateTime.now().toIso8601String(),
-        if (status == 'RECEIVED')
-          'received_date': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  Future<String> generatePurchaseOrderNumber(int businessId) async {
+    final db = await database;
+
+    // Get the latest order number for the business
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT order_number 
+      FROM purchase_orders 
+      WHERE business_id = ? 
+      ORDER BY id DESC 
+      LIMIT 1
+    ''', [businessId]);
+
+    if (result.isEmpty) {
+      // First order for this business
+      return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}001';
+    }
+
+    final String lastOrderNumber = result.first['order_number'] as String;
+    // Extract the sequence number (last 3 digits)
+    final int sequence = int.parse(lastOrderNumber.substring(lastOrderNumber.length - 3)) + 1;
+    // Create new order number with current date
+    return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}${sequence.toString().padLeft(3, '0')}';
+  }
+
+  Future<Map<String, double>> getBusinessProfitAndCapital(
+      int businessId) async {
+    final db = await database;
+    final now = DateTime.now();
+
+    try {
+      // Get total receivable from customers
+      final customerReceivableResult = await db.rawQuery('''
+        SELECT COALESCE(SUM(balance), 0) as total
+        FROM customers
+        WHERE business_id = ? AND balance < 0
+      ''', [businessId]);
+      final customerReceivable =
+          ((customerReceivableResult.first['total'] as num?)?.toDouble() ?? 0.0)
+              .abs();
+
+      // Get total payable to customers
+      final customerPayableResult = await db.rawQuery('''
+        SELECT COALESCE(SUM(balance), 0) as total
+        FROM customers
+        WHERE business_id = ? AND balance > 0
+      ''', [businessId]);
+      final customerPayable =
+          (customerPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
+      // Get total payable to suppliers
+      final supplierPayableResult = await db.rawQuery('''
+        SELECT COALESCE(SUM(balance), 0) as total
+        FROM suppliers
+        WHERE business_id = ? AND balance != 0
+      ''', [businessId]);
+      final supplierPayable =
+          (supplierPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
+
+      // Calculate total capital (receivable - payable)
+      final totalCapital =
+          customerReceivable - (customerPayable + supplierPayable);
+
+      // Get this month's transactions
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      // Calculate this month's profit
+      final monthProfitResult = await db.rawQuery('''
+        SELECT 
+          COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as receivable,
+          COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as payable
+        FROM transactions
+        WHERE (customer_id IN (
+          SELECT id FROM customers WHERE business_id = ?
+        ) OR supplier_id IN (
+          SELECT id FROM suppliers WHERE business_id = ?
+        ))
+        AND date BETWEEN ? AND ?
+      ''', [
+        businessId,
+        businessId,
+        DateFormat('yyyy-MM-dd').format(startOfMonth),
+        DateFormat('yyyy-MM-dd').format(endOfMonth)
+      ]);
+
+      final monthReceivable =
+          (monthProfitResult.first['receivable'] as num).toDouble();
+      final monthPayable =
+          (monthProfitResult.first['payable'] as num).toDouble();
+      final monthlyProfit = monthReceivable - monthPayable;
+
+      return {
+        'totalCapital': totalCapital,
+        'monthlyProfit': monthlyProfit,
+      };
+    } catch (e) {
+      print('Error calculating business profit and capital: $e');
+      return {
+        'totalCapital': 0.0,
+        'monthlyProfit': 0.0,
+      };
+    }
+  }
+
+  Future<List<InventoryBatch>> getInventoryBatches(int itemId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory_batches',
+      where: 'item_id = ?',
+      whereArgs: [itemId],
+    );
+    return List.generate(maps.length, (i) => InventoryBatch.fromMap(maps[i]));
+  }
+
+  // Update purchase order item
+  Future<int> updatePurchaseOrderItem(PurchaseOrderItem item) async {
+    final db = await database;
+    return await db.update(
+      'purchase_order_items',
+      item.toMap(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  // Delete purchase order item
+  Future<int> deletePurchaseOrderItem(int itemId) async {
+    final db = await database;
+    return await db.delete(
+      'purchase_order_items',
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+  }
+
+  // Bill-related methods
+  Future<int> addBill(Map<String, dynamic> bill) async {
+    final db = await instance.database;
+    return await db.insert('bills', bill);
+  }
+
+  Future<int> addBillItem(Map<String, dynamic> billItem) async {
+    final db = await instance.database;
+    return await db.insert('bill_items', billItem);
+  }
+
+  Future<List<Map<String, dynamic>>> getBills(int businessId) async {
+    final db = await instance.database;
+    return await db.query(
+      'bills',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getBillItems(int billId) async {
+    final db = await instance.database;
+    return await db.query(
+      'bill_items',
+      where: 'bill_id = ?',
+      whereArgs: [billId],
+    );
+  }
+
+  Future<Map<String, dynamic>> getBill(int billId) async {
+    final db = await instance.database;
+    final bills = await db.query(
+      'bills',
+      where: 'id = ?',
+      whereArgs: [billId],
+      limit: 1,
+    );
+    return bills.first;
+  }
+
+  Future<void> updateBillStatus(int billId, String status, {DateTime? paidAt}) async {
+    final db = await instance.database;
+    await db.update(
+      'bills',
+      {
+        'status': status,
+        if (paidAt != null) 'paid_at': paidAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [billId],
+    );
+  }
+
+  // Get a single customer by ID
+  Future<Map<String, dynamic>> getCustomer(int customerId) async {
+    final db = await instance.database;
+    final customers = await db.query(
+      'customers',
+      where: 'id = ?',
+      whereArgs: [customerId],
+      limit: 1,
+    );
+    if (customers.isEmpty) {
+      throw Exception('Customer not found');
+    }
+    return customers.first;
+  }
+
+  // Update inventory stock
+  Future<void> updateInventoryStock(int itemId, int newStock) async {
+    final db = await instance.database;
+    await db.update(
+      'inventory_items',
+      {'current_stock': newStock},
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+
+    // Add a stock movement record
+    await addStockMovement(
+      StockMovement(
+        businessId: 0, // This will be set by the calling function
+        itemId: itemId,
+        movementType: 'SALE',
+        quantity: -newStock,
+        unitPrice: 0, // This will be set by the calling function
+        totalPrice: 0, // This will be set by the calling function
+        date: DateTime.now().toIso8601String(),
+      ),
     );
   }
 
@@ -1619,140 +1940,5 @@ CREATE TABLE businesses (
       debugPrint('Error receiving purchase order items: $e');
       rethrow;
     }
-  }
-
-  Future<String> generatePurchaseOrderNumber(int businessId) async {
-    final db = await database;
-
-    // Get the latest order number for the business
-    final List<Map<String, dynamic>> result = await db.rawQuery('''
-      SELECT order_number 
-      FROM purchase_orders 
-      WHERE business_id = ? 
-      ORDER BY id DESC 
-      LIMIT 1
-    ''', [businessId]);
-
-    if (result.isEmpty) {
-      // First order for this business
-      return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}001';
-    }
-
-    final String lastOrderNumber = result.first['order_number'] as String;
-    // Extract the sequence number (last 3 digits)
-    final int sequence = int.parse(lastOrderNumber.substring(lastOrderNumber.length - 3)) + 1;
-    // Create new order number with current date
-    return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}${sequence.toString().padLeft(3, '0')}';
-  }
-
-  Future<Map<String, double>> getBusinessProfitAndCapital(
-      int businessId) async {
-    final db = await database;
-    final now = DateTime.now();
-
-    try {
-      // Get total receivable from customers
-      final customerReceivableResult = await db.rawQuery('''
-        SELECT COALESCE(SUM(balance), 0) as total
-        FROM customers
-        WHERE business_id = ? AND balance < 0
-      ''', [businessId]);
-      final customerReceivable =
-          ((customerReceivableResult.first['total'] as num?)?.toDouble() ?? 0.0)
-              .abs();
-
-      // Get total payable to customers
-      final customerPayableResult = await db.rawQuery('''
-        SELECT COALESCE(SUM(balance), 0) as total
-        FROM customers
-        WHERE business_id = ? AND balance > 0
-      ''', [businessId]);
-      final customerPayable =
-          (customerPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
-
-      // Get total payable to suppliers
-      final supplierPayableResult = await db.rawQuery('''
-        SELECT COALESCE(SUM(balance), 0) as total
-        FROM suppliers
-        WHERE business_id = ? AND balance != 0
-      ''', [businessId]);
-      final supplierPayable =
-          (supplierPayableResult.first['total'] as num?)?.toDouble() ?? 0.0;
-
-      // Calculate total capital (receivable - payable)
-      final totalCapital =
-          customerReceivable - (customerPayable + supplierPayable);
-
-      // Get this month's transactions
-      final startOfMonth = DateTime(now.year, now.month, 1);
-      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-
-      // Calculate this month's profit
-      final monthProfitResult = await db.rawQuery('''
-        SELECT 
-          COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as receivable,
-          COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as payable
-        FROM transactions
-        WHERE (customer_id IN (
-          SELECT id FROM customers WHERE business_id = ?
-        ) OR supplier_id IN (
-          SELECT id FROM suppliers WHERE business_id = ?
-        ))
-        AND date BETWEEN ? AND ?
-      ''', [
-        businessId,
-        businessId,
-        DateFormat('yyyy-MM-dd').format(startOfMonth),
-        DateFormat('yyyy-MM-dd').format(endOfMonth)
-      ]);
-
-      final monthReceivable =
-          (monthProfitResult.first['receivable'] as num).toDouble();
-      final monthPayable =
-          (monthProfitResult.first['payable'] as num).toDouble();
-      final monthlyProfit = monthReceivable - monthPayable;
-
-      return {
-        'totalCapital': totalCapital,
-        'monthlyProfit': monthlyProfit,
-      };
-    } catch (e) {
-      print('Error calculating business profit and capital: $e');
-      return {
-        'totalCapital': 0.0,
-        'monthlyProfit': 0.0,
-      };
-    }
-  }
-
-  Future<List<InventoryBatch>> getInventoryBatches(int itemId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'inventory_batches',
-      where: 'item_id = ?',
-      whereArgs: [itemId],
-    );
-    return List.generate(maps.length, (i) => InventoryBatch.fromMap(maps[i]));
-  }
-
-  // Update purchase order item
-  Future<int> updatePurchaseOrderItem(PurchaseOrderItem item) async {
-    final db = await database;
-    return await db.update(
-      'purchase_order_items',
-      item.toMap(),
-      where: 'id = ?',
-      whereArgs: [item.id],
-    );
-  }
-
-  // Delete purchase order item
-  Future<int> deletePurchaseOrderItem(int itemId) async {
-    final db = await database;
-    return await db.delete(
-      'purchase_order_items',
-      where: 'id = ?',
-      whereArgs: [itemId],
-    );
   }
 }

@@ -15,6 +15,7 @@ class NavigationPanel extends StatefulWidget {
   final VoidCallback onLogout;
   final VoidCallback onSuppliers;
   final VoidCallback onInventory;
+  final VoidCallback onBilling;
 
   const NavigationPanel({
     super.key,
@@ -23,6 +24,7 @@ class NavigationPanel extends StatefulWidget {
     required this.onSettings,
     required this.onLogout,
     required this.onInventory,
+    required this.onBilling,
   });
 
   @override
@@ -376,6 +378,16 @@ class _NavigationPanelState extends State<NavigationPanel> {
         text: 'Inventory',
         onTap: () {
           widget.onInventory();
+          if (MediaQuery.of(context).size.width < 600) {
+            Navigator.pop(context);
+          }
+        },
+      ),
+      _buildDrawerItem(
+        icon: Icons.receipt_long,
+        text: 'Billing',
+        onTap: () {
+          widget.onBilling();
           if (MediaQuery.of(context).size.width < 600) {
             Navigator.pop(context);
           }

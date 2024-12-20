@@ -1,4 +1,5 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 
 class SoundService {
   static final SoundService _instance = SoundService._internal();
@@ -23,7 +24,9 @@ class SoundService {
       await initialize();
       await _audioPlayer.resume();
     } catch (e) {
-      print('Error playing beep sound: $e');
+      if (kDebugMode) {
+        print('Error playing beep sound: $e');
+      }
     }
   }
 

@@ -8,6 +8,7 @@ import 'package:path/path.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert'; // For UTF8 encoding
 import 'package:crypto/crypto.dart'; // For hashing the password
+import 'package:sqflite/sqflite.dart';
 import 'dart:io'; // Added import
 import 'dart:ffi';
 import 'package:sqlite3/open.dart';
@@ -77,7 +78,7 @@ class DatabaseHelper {
     // Version set to 1 initially, can be increased for future upgrades
     return await sqflite.openDatabase(
       path,
-      version: 6,  // Increased from 5 to 6
+      version: 8, // Increased from 7 to 8
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -204,6 +205,7 @@ CREATE TABLE supplier_balances (
         selling_price REAL NOT NULL, 
         cost_price REAL NOT NULL,
         weighted_average_cost REAL NOT NULL,
+        gst_rate REAL NOT NULL DEFAULT 0,
         current_stock INTEGER NOT NULL DEFAULT 0,
         reorder_level INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -275,17 +277,52 @@ CREATE TABLE supplier_balances (
         FOREIGN KEY (item_id) REFERENCES inventory_items(id)
       );
     ''');
+
+    // Create bills table
+    await db.execute('''
+CREATE TABLE bills (
+  id $idType,
+  business_id INTEGER NOT NULL,
+  customer_id INTEGER NOT NULL,
+  sub_total REAL NOT NULL,
+  gst_amount REAL NOT NULL,
+  discount REAL NOT NULL,
+  total REAL NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  paid_at TEXT,
+  notes TEXT,
+  delivery_charge REAL NOT NULL DEFAULT 0,
+  FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE,
+  FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+)
+''');
+
+    // Create bill_items table
+    await db.execute('''
+CREATE TABLE bill_items (
+  id $idType,
+  bill_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  price REAL NOT NULL,
+  gst_rate REAL NOT NULL,
+  notes TEXT,
+  FOREIGN KEY (bill_id) REFERENCES bills (id) ON DELETE CASCADE,
+  FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
+)
+''');
   }
 
   Future<void> _onUpgrade(
       sqflite.Database db, int oldVersion, int newVersion) async {
     debugPrint('Upgrading database from version $oldVersion to $newVersion');
-    
+
     if (oldVersion < 6) {
       try {
         // Drop and recreate the businesses table
         await db.execute('DROP TABLE IF EXISTS businesses');
-        
+
         // Create the new businesses table with all columns
         await db.execute('''
 CREATE TABLE businesses (
@@ -310,6 +347,20 @@ CREATE TABLE businesses (
         debugPrint('Stack trace: $stackTrace');
         rethrow;
       }
+    }
+
+    if (oldVersion < 7) {
+      // Add delivery_charge column to bills table
+      await db.execute('''
+        ALTER TABLE bills ADD COLUMN delivery_charge REAL NOT NULL DEFAULT 0
+      ''');
+    }
+
+    if (oldVersion < 8) {
+      // Add gst_rate column to inventory_items table
+      await db.execute('''
+        ALTER TABLE inventory_items ADD COLUMN gst_rate REAL NOT NULL DEFAULT 0
+      ''');
     }
   }
 
@@ -358,10 +409,10 @@ CREATE TABLE businesses (
     try {
       debugPrint('Adding business with data: $business');
       final db = await database;
-      
+
       // Remove empty id from the map
       business.remove('id');
-      
+
       final id = await db.insert(
         'businesses',
         business,
@@ -464,6 +515,20 @@ CREATE TABLE businesses (
       whereArgs: [id],
     );
 
+    // Delete all bills for the business
+    await db.delete(
+      'bills',
+      where: 'business_id = ?',
+      whereArgs: [id],
+    );
+
+    // Delete all bill items for the business
+    await db.delete(
+      'bill_items',
+      where: 'bill_id IN (SELECT id FROM bills WHERE business_id = ?)',
+      whereArgs: [id],
+    );
+
     // Finally, delete the business
     await db.delete(
       'businesses',
@@ -532,8 +597,6 @@ CREATE TABLE businesses (
       return null;
     }
   }
-
-  // Other customer-related methods...
 
   // Add a method to add a transaction to the database
   Future<void> addTransaction(my_model.Transaction transaction) async {
@@ -1149,12 +1212,35 @@ CREATE TABLE businesses (
 
   // Inventory Items Methods
   Future<List<InventoryItem>> getInventoryItems(int businessId) async {
+    debugPrint(
+        'DatabaseHelper - Getting inventory items for business: $businessId');
     final db = await database;
+
+    // First check if any items exist at all
+    final allItemsCount =
+        await db.rawQuery('SELECT COUNT(*) as count FROM inventory_items');
+    debugPrint(
+        'DatabaseHelper - Total items in database: ${allItemsCount.first['count']}');
+
+    // Check business IDs in the table
+    final businessIds =
+        await db.rawQuery('SELECT DISTINCT business_id FROM inventory_items');
+    debugPrint('DatabaseHelper - Business IDs in inventory: $businessIds');
+
+    // Get items for specific business
     final List<Map<String, dynamic>> maps = await db.query(
       'inventory_items',
       where: 'business_id = ?',
       whereArgs: [businessId],
     );
+    debugPrint(
+        'DatabaseHelper - Found ${maps.length} inventory items for business $businessId');
+    debugPrint('DatabaseHelper - Query results: $maps');
+
+    // Check table structure
+    final tableInfo = await db.rawQuery('PRAGMA table_info(inventory_items)');
+    debugPrint('DatabaseHelper - Table structure: $tableInfo');
+
     return List.generate(maps.length, (i) => InventoryItem.fromMap(maps[i]));
   }
 
@@ -1168,6 +1254,18 @@ CREATE TABLE businesses (
     );
     if (maps.isEmpty) return null;
     return InventoryItem.fromMap(maps.first);
+  }
+
+  Future<void> insertInventoryItem(InventoryItem item) async {
+    debugPrint(
+        'DatabaseHelper - Inserting inventory item with business ID: ${item.businessId}');
+    final db = await database;
+    await db.insert(
+      'inventory_items',
+      item.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper - Item inserted successfully');
   }
 
   Future<int> addInventoryItem(InventoryItem item) async {
@@ -1222,6 +1320,17 @@ CREATE TABLE businesses (
         throw Exception('Cannot delete item with existing purchase orders');
       }
 
+      // Check if there are any related bill items
+      final billItems = await txn.query(
+        'bill_items',
+        where: 'item_id = ?',
+        whereArgs: [id],
+      );
+
+      if (billItems.isNotEmpty) {
+        throw Exception('Cannot delete item with existing bills');
+      }
+
       // If no related records exist, delete the item
       await txn.delete(
         'inventory_items',
@@ -1243,64 +1352,9 @@ CREATE TABLE businesses (
     return List.generate(maps.length, (i) => StockMovement.fromMap(maps[i]));
   }
 
-  Future<int> addStockMovement(StockMovement movement) async {
+  Future<void> addStockMovement(StockMovement movement) async {
     final db = await database;
-    int movementId = 0;
-
-    try {
-      // Start a transaction with immediate mode to prevent deadlocks
-      await db.transaction((txn) async {
-        // Get the current item with a row lock
-        final List<Map<String, dynamic>> itemMaps = await txn.query(
-          'inventory_items',
-          where: 'id = ?',
-          whereArgs: [movement.itemId],
-        );
-
-        if (itemMaps.isEmpty) {
-          throw Exception('Item not found');
-        }
-
-        final item = InventoryItem.fromMap(itemMaps.first);
-
-        // Calculate new stock level
-        final newStock = movement.movementType == 'IN'
-            ? item.currentStock + movement.quantity
-            : item.currentStock - movement.quantity;
-
-        if (movement.movementType == 'OUT' && newStock < 0) {
-          throw Exception('Insufficient stock');
-        }
-
-        // Calculate new weighted average cost for stock IN movements
-        double newWeightedAverageCost = item.weightedAverageCost;
-        if (movement.movementType == 'IN' && movement.quantity > 0) {
-          final totalOldValue = item.currentStock * item.weightedAverageCost;
-          final newValue = movement.quantity * movement.unitPrice;
-          newWeightedAverageCost = (totalOldValue + newValue) / newStock;
-        }
-
-        // Update the inventory item's current stock and weighted average cost
-        await txn.update(
-          'inventory_items',
-          {
-            'current_stock': newStock,
-            'weighted_average_cost': newWeightedAverageCost,
-            'updated_at': DateTime.now().toIso8601String()
-          },
-          where: 'id = ?',
-          whereArgs: [movement.itemId],
-        );
-
-        // Insert the movement
-        movementId = await txn.insert('stock_movements', movement.toMap());
-      }, exclusive: true); // Use exclusive mode for the transaction
-
-      return movementId;
-    } catch (e) {
-      debugPrint('Error adding stock movement: $e');
-      rethrow;
-    }
+    await db.insert('stock_movements', movement.toMap());
   }
 
   Future<List<StockMovement>> getItemStockMovements(int itemId) async {
@@ -1312,12 +1366,6 @@ CREATE TABLE businesses (
       orderBy: 'date DESC',
     );
     return List.generate(maps.length, (i) => StockMovement.fromMap(maps[i]));
-  }
-
-  // Debug method to verify transactions
-  Future<List<Map<String, dynamic>>> verifyTransactions() async {
-    final db = await database;
-    return await db.query('transactions', orderBy: 'date DESC');
   }
 
   // Purchase Orders Methods
@@ -1441,184 +1489,10 @@ CREATE TABLE businesses (
       {
         'status': status,
         'updated_at': DateTime.now().toIso8601String(),
-        if (status == 'RECEIVED')
-          'received_date': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
       whereArgs: [id],
     );
-  }
-
-  Future<void> receivePurchaseOrderItems(
-      int orderId, List<PurchaseOrderItem> items) async {
-    final db = await database;
-
-    try {
-      await db.transaction((txn) async {
-        // Get the order to update its status
-        final List<Map<String, dynamic>> orderMaps = await txn.query(
-          'purchase_orders',
-          where: 'id = ?',
-          whereArgs: [orderId],
-        );
-
-        if (orderMaps.isEmpty) {
-          throw Exception('Order not found');
-        }
-
-        // Check if order is already received
-        final order = PurchaseOrder.fromMap(orderMaps.first, []);
-        if (order.status == 'RECEIVED') {
-          throw Exception('Order is already received');
-        }
-
-        // Update order status and received date
-        await txn.update(
-          'purchase_orders',
-          {
-            'status': 'RECEIVED',
-            'received_date': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [orderId],
-        );
-
-        // Process each item
-        for (var item in items) {
-          if (item.receivedQuantity <= 0) continue;
-
-          // Get the current inventory item with batches
-          final List<Map<String, dynamic>> itemMaps = await txn.query(
-            'inventory_items',
-            where: 'id = ?',
-            whereArgs: [item.itemId],
-          );
-
-          if (itemMaps.isEmpty) {
-            throw Exception('Inventory item not found');
-          }
-
-          final inventoryItem = InventoryItem.fromMap(itemMaps.first);
-
-          // Create new batch for received items
-          final batch = InventoryBatch(
-            itemId: item.itemId,
-            quantity: item.receivedQuantity,
-            costPrice: item.unitPrice,
-            purchaseDate: DateTime.now().toIso8601String(),
-            referenceType: 'PURCHASE_ORDER',
-            referenceId: orderId,
-          );
-
-          await txn.insert('inventory_batches', batch.toMap());
-
-          // Get all batches to calculate new weighted average cost
-          final List<Map<String, dynamic>> batchMaps = await txn.query(
-            'inventory_batches',
-            where: 'item_id = ?',
-            whereArgs: [item.itemId],
-          );
-
-          final batches = batchMaps.map((m) => InventoryBatch.fromMap(m)).toList();
-          final newItem = InventoryItem.fromMap(itemMaps.first, batches: batches);
-
-          // Calculate new weighted average cost
-          final newWeightedAvgCost = newItem.calculateWeightedAverageCost();
-          final newStock = inventoryItem.currentStock + item.receivedQuantity;
-
-          // Update inventory item
-          await txn.update(
-            'inventory_items',
-            {
-              'current_stock': newStock,
-              'weighted_average_cost': newWeightedAvgCost,
-              'cost_price': item.unitPrice, // Latest purchase price
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            where: 'id = ?',
-            whereArgs: [item.itemId],
-          );
-
-          // Update purchase order item
-          await txn.update(
-            'purchase_order_items',
-            {
-              'received_quantity': item.receivedQuantity,
-            },
-            where: 'id = ?',
-            whereArgs: [item.id],
-          );
-
-          // Create stock movement record
-          await txn.insert('stock_movements', {
-            'business_id': inventoryItem.businessId,
-            'item_id': item.itemId,
-            'movement_type': 'IN',
-            'quantity': item.receivedQuantity,
-            'unit_price': item.unitPrice,
-            'total_price': item.unitPrice * item.receivedQuantity,
-            'reference_type': 'PURCHASE_ORDER',
-            'reference_id': orderId,
-            'notes': 'Received from PO #$orderId',
-            'date': DateTime.now().toIso8601String(),
-          });
-        }
-
-        // Calculate total amount for supplier transaction
-        double totalAmount = items.fold(0, (sum, item) => 
-          sum + (item.receivedQuantity * item.unitPrice));
-
-        // Get supplier ID from purchase order
-        final supplierId = orderMaps.first['supplier_id'] as int;
-        final businessId = orderMaps.first['business_id'] as int;
-
-        // Get current supplier balance
-        final List<Map<String, dynamic>> supplierMaps = await txn.query(
-          'suppliers',
-          where: 'id = ?',
-          whereArgs: [supplierId],
-        );
-
-        if (supplierMaps.isEmpty) {
-          throw Exception('Supplier not found');
-        }
-
-        final currentBalance = supplierMaps.first['balance'] as double;
-        final newBalance = currentBalance + totalAmount;
-
-        // Create supplier transaction in transactions table
-        await txn.insert('transactions', {
-          'supplier_id': supplierId,
-          'amount': totalAmount,  // Positive amount for payable to supplier
-          'date': DateTime.now().toIso8601String(),
-          'notes': 'Purchase Order #$orderId received',
-          'balance': newBalance,
-          'reference_type': 'PURCHASE_ORDER',
-          'reference_id': orderId,
-          'customer_id': null,  // This is a supplier transaction
-        });
-
-        // Update supplier balance
-        await txn.update(
-          'suppliers',
-          {'balance': newBalance},
-          where: 'id = ?',
-          whereArgs: [supplierId],
-        );
-
-        // Update supplier balances record using the transaction
-        await upsertSupplierBalances(
-          businessId,
-          DateTime.now().toIso8601String().split('T')[0],
-          newBalance,
-          txn: txn,
-        );
-      });
-    } catch (e) {
-      debugPrint('Error receiving purchase order items: $e');
-      rethrow;
-    }
   }
 
   Future<String> generatePurchaseOrderNumber(int businessId) async {
@@ -1640,7 +1514,8 @@ CREATE TABLE businesses (
 
     final String lastOrderNumber = result.first['order_number'] as String;
     // Extract the sequence number (last 3 digits)
-    final int sequence = int.parse(lastOrderNumber.substring(lastOrderNumber.length - 3)) + 1;
+    final int sequence =
+        int.parse(lastOrderNumber.substring(lastOrderNumber.length - 3)) + 1;
     // Create new order number with current date
     return 'PO${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}${sequence.toString().padLeft(3, '0')}';
   }
@@ -1754,5 +1629,413 @@ CREATE TABLE businesses (
       where: 'id = ?',
       whereArgs: [itemId],
     );
+  }
+
+  // Bill-related methods
+  Future<List<Map<String, dynamic>>> getBills(int businessId) async {
+    debugPrint('DatabaseHelper - Getting bills for business: $businessId');
+    final db = await instance.database;
+    try {
+      // Join with customers table and businesses table to get all details
+      final List<Map<String, dynamic>> bills = await db.rawQuery('''
+        SELECT 
+          b.*,
+          c.id as customer_id,
+          c.business_id as customer_business_id,
+          c.name as customer_name,
+          c.phone as customer_phone,
+          c.balance as customer_balance,
+          c.address as customer_address,
+          c.pan as customer_pan,
+          c.gstin as customer_gstin,
+          bus.name as business_name,
+          bus.address as business_address,
+          bus.phone as business_phone,
+          bus.email as business_email,
+          bus.gstin as business_gstin,
+          bus.pan as business_pan
+        FROM bills b
+        LEFT JOIN customers c ON b.customer_id = c.id
+        LEFT JOIN businesses bus ON b.business_id = bus.id
+        WHERE b.business_id = ?
+        ORDER BY b.created_at DESC
+      ''', [businessId]);
+      
+      debugPrint('DatabaseHelper - Raw bills: $bills');
+      
+      // Create new list to store processed bills
+      final List<Map<String, dynamic>> processedBills = [];
+      
+      // For each bill, create a new map with all the data
+      for (final bill in bills) {
+        final billId = bill['id'] as int;
+        final items = await getBillItems(billId);
+        
+        // Create a new map for the bill
+        final processedBill = Map<String, dynamic>.from(bill);
+        
+        // Add items
+        processedBill['items'] = items;
+        
+        // Create customer map with proper structure
+        processedBill['customer'] = {
+          'id': bill['customer_id'] ?? 0,
+          'business_id': bill['customer_business_id'] ?? businessId,
+          'name': bill['customer_name'] ?? 'Unknown Customer',
+          'phone': bill['customer_phone'] ?? '',
+          'balance': bill['customer_balance'] ?? 0.0,
+          'address': bill['customer_address'] ?? '',
+          'pan': bill['customer_pan'] ?? '',
+          'gstin': bill['customer_gstin'] ?? '',
+        };
+
+        // Create business map with proper structure
+        processedBill['business'] = {
+          'id': businessId,
+          'name': bill['business_name'] ?? '',
+          'address': bill['business_address'] ?? '',
+          'phone': bill['business_phone'] ?? '',
+          'email': bill['business_email'] ?? '',
+          'gstin': bill['business_gstin'] ?? '',
+          'pan': bill['business_pan'] ?? '',
+        };
+        
+        // Remove redundant fields
+        processedBill.remove('customer_id');
+        processedBill.remove('customer_business_id');
+        processedBill.remove('customer_name');
+        processedBill.remove('customer_phone');
+        processedBill.remove('customer_balance');
+        processedBill.remove('customer_address');
+        processedBill.remove('customer_pan');
+        processedBill.remove('customer_gstin');
+        processedBill.remove('business_name');
+        processedBill.remove('business_address');
+        processedBill.remove('business_phone');
+        processedBill.remove('business_email');
+        processedBill.remove('business_gstin');
+        processedBill.remove('business_pan');
+        
+        processedBills.add(processedBill);
+      }
+      
+      debugPrint('DatabaseHelper - Processed bills: $processedBills');
+      return processedBills;
+    } catch (e, stackTrace) {
+      debugPrint('DatabaseHelper - Error getting bills: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBillItems(int billId) async {
+    debugPrint('DatabaseHelper - Getting items for bill: $billId');
+    final db = await instance.database;
+    try {
+      final items = await db.rawQuery('''
+        SELECT 
+          bi.id,
+          bi.bill_id,
+          bi.item_id,
+          bi.quantity,
+          bi.price,
+          bi.gst_rate,
+          bi.notes,
+          i.business_id as item_business_id,
+          i.name as item_name,
+          i.description as item_description,
+          i.current_stock as item_stock,
+          i.unit as item_unit,
+          i.selling_price as item_selling_price
+        FROM bill_items bi
+        LEFT JOIN inventory_items i ON bi.item_id = i.id
+        WHERE bi.bill_id = ?
+      ''', [billId]);
+      
+      debugPrint('DatabaseHelper - Raw bill items: $items');
+      
+      // Process items to include full item details
+      final processedItems = items.map((item) {
+        final processedItem = Map<String, dynamic>.from(item);
+        processedItem['item'] = {
+          'id': item['item_id'],
+          'business_id': item['item_business_id'],
+          'name': item['item_name'],
+          'description': item['item_description'],
+          'current_stock': item['item_stock'],
+          'unit': item['item_unit'],
+          'selling_price': item['item_selling_price'],
+        };
+        
+        // Remove redundant fields
+        processedItem.remove('item_id');
+        processedItem.remove('item_business_id');
+        processedItem.remove('item_name');
+        processedItem.remove('item_description');
+        processedItem.remove('item_stock');
+        processedItem.remove('item_unit');
+        processedItem.remove('item_selling_price');
+        
+        return processedItem;
+      }).toList();
+      
+      debugPrint('DatabaseHelper - Processed bill items: $processedItems');
+      return processedItems;
+    } catch (e, stackTrace) {
+      debugPrint('DatabaseHelper - Error getting bill items: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getBill(int billId) async {
+    final db = await instance.database;
+    final bills = await db.query(
+      'bills',
+      where: 'id = ?',
+      whereArgs: [billId],
+      limit: 1,
+    );
+    return bills.first;
+  }
+
+  Future<void> updateBillStatus(int billId, String status,
+      {DateTime? paidAt}) async {
+    final db = await instance.database;
+    await db.update(
+      'bills',
+      {
+        'status': status,
+        if (paidAt != null) 'paid_at': paidAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [billId],
+    );
+  }
+
+  // Get a single customer by ID
+  Future<Map<String, dynamic>> getCustomer(int customerId) async {
+    final db = await instance.database;
+    final customers = await db.query(
+      'customers',
+      where: 'id = ?',
+      whereArgs: [customerId],
+      limit: 1,
+    );
+    if (customers.isEmpty) {
+      throw Exception('Customer not found');
+    }
+    return customers.first;
+  }
+
+  // Update inventory stock
+  Future<void> updateInventoryStock(int itemId, int newStock) async {
+    final db = await instance.database;
+    await db.update(
+      'inventory_items',
+      {'current_stock': newStock},
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+
+    // Add a stock movement record
+    await addStockMovement(
+      StockMovement(
+        businessId: 0, // This will be set by the calling function
+        itemId: itemId,
+        movementType: 'SALE',
+        quantity: -newStock,
+        unitPrice: 0, // This will be set by the calling function
+        totalPrice: 0, // This will be set by the calling function
+        date: DateTime.now().toIso8601String(),
+      ),
+    );
+  }
+
+  Future<void> receivePurchaseOrderItems(
+      int orderId, List<PurchaseOrderItem> items) async {
+    final db = await database;
+
+    try {
+      await db.transaction((txn) async {
+        // Get the order to update its status
+        final List<Map<String, dynamic>> orderMaps = await txn.query(
+          'purchase_orders',
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+
+        if (orderMaps.isEmpty) {
+          throw Exception('Order not found');
+        }
+
+        // Check if order is already received
+        final order = PurchaseOrder.fromMap(orderMaps.first, []);
+        if (order.status == 'RECEIVED') {
+          throw Exception('Order is already received');
+        }
+
+        // Update order status and received date
+        await txn.update(
+          'purchase_orders',
+          {
+            'status': 'RECEIVED',
+            'received_date': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+
+        // Process each item
+        for (var item in items) {
+          if (item.receivedQuantity <= 0) continue;
+
+          // Get the current inventory item with batches
+          final List<Map<String, dynamic>> itemMaps = await txn.query(
+            'inventory_items',
+            where: 'id = ?',
+            whereArgs: [item.itemId],
+          );
+
+          if (itemMaps.isEmpty) {
+            throw Exception('Inventory item not found');
+          }
+
+          final inventoryItem = InventoryItem.fromMap(itemMaps.first);
+
+          // Create new batch for received items
+          final batch = InventoryBatch(
+            itemId: item.itemId,
+            quantity: item.receivedQuantity,
+            costPrice: item.unitPrice,
+            purchaseDate: DateTime.now().toIso8601String(),
+            referenceType: 'PURCHASE_ORDER',
+            referenceId: orderId,
+          );
+
+          await txn.insert('inventory_batches', batch.toMap());
+
+          // Get all batches to calculate new weighted average cost
+          final List<Map<String, dynamic>> batchMaps = await txn.query(
+            'inventory_batches',
+            where: 'item_id = ?',
+            whereArgs: [item.itemId],
+          );
+
+          final batches =
+              batchMaps.map((m) => InventoryBatch.fromMap(m)).toList();
+          final newItem =
+              InventoryItem.fromMap(itemMaps.first, batches: batches);
+
+          // Calculate new weighted average cost
+          final newWeightedAvgCost = newItem.calculateWeightedAverageCost();
+          final newStock = inventoryItem.currentStock + item.receivedQuantity;
+
+          // Update inventory item
+          await txn.update(
+            'inventory_items',
+            {
+              'current_stock': newStock,
+              'weighted_average_cost': newWeightedAvgCost,
+              'cost_price': item.unitPrice, // Latest purchase price
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [item.itemId],
+          );
+
+          // Update purchase order item
+          await txn.update(
+            'purchase_order_items',
+            {
+              'received_quantity': item.receivedQuantity,
+            },
+            where: 'id = ?',
+            whereArgs: [item.id],
+          );
+
+          // Create stock movement record
+          await txn.insert('stock_movements', {
+            'business_id': inventoryItem.businessId,
+            'item_id': item.itemId,
+            'movement_type': 'IN',
+            'quantity': item.receivedQuantity,
+            'unit_price': item.unitPrice,
+            'total_price': item.unitPrice * item.receivedQuantity,
+            'reference_type': 'PURCHASE_ORDER',
+            'reference_id': orderId,
+            'notes': 'Received from PO #$orderId',
+            'date': DateTime.now().toIso8601String(),
+          });
+        }
+
+        // Calculate total amount for supplier transaction
+        double totalAmount = items.fold(
+            0, (sum, item) => sum + (item.receivedQuantity * item.unitPrice));
+
+        // Get supplier ID from purchase order
+        final supplierId = orderMaps.first['supplier_id'] as int;
+        final businessId = orderMaps.first['business_id'] as int;
+
+        // Get current supplier balance
+        final List<Map<String, dynamic>> supplierMaps = await txn.query(
+          'suppliers',
+          where: 'id = ?',
+          whereArgs: [supplierId],
+        );
+
+        if (supplierMaps.isEmpty) {
+          throw Exception('Supplier not found');
+        }
+
+        final currentBalance = supplierMaps.first['balance'] as double;
+        final newBalance = currentBalance + totalAmount;
+
+        // Create supplier transaction in transactions table
+        await txn.insert('transactions', {
+          'supplier_id': supplierId,
+          'amount': totalAmount, // Positive amount for payable to supplier
+          'date': DateTime.now().toIso8601String(),
+          'notes': 'Purchase Order #$orderId received',
+          'balance': newBalance,
+          'reference_type': 'PURCHASE_ORDER',
+          'reference_id': orderId,
+          'customer_id': null, // This is a supplier transaction
+        });
+
+        // Update supplier balance
+        await txn.update(
+          'suppliers',
+          {'balance': newBalance},
+          where: 'id = ?',
+          whereArgs: [supplierId],
+        );
+
+        // Update supplier balances record using the transaction
+        await upsertSupplierBalances(
+          businessId,
+          DateTime.now().toIso8601String().split('T')[0],
+          newBalance,
+          txn: txn,
+        );
+      });
+    } catch (e) {
+      debugPrint('Error receiving purchase order items: $e');
+      rethrow;
+    }
+  }
+
+  // Get current stock for an item
+  Future<int> getItemStock(int itemId) async {
+    final db = await database;
+    final result = await db.query(
+      'inventory_items',
+      columns: ['current_stock'],
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+    if (result.isEmpty) return 0;
+    return result.first['current_stock'] as int;
   }
 }

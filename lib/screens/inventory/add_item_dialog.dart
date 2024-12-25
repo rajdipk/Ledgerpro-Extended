@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/inventory_item_model.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../providers/business_provider.dart';
 import '../../widgets/barcode_scanner_dialog.dart';
 import '../../utils/sku_generator.dart';
 
@@ -28,6 +29,7 @@ class _AddItemDialogState extends State<AddItemDialog> {
   final _costPriceController = TextEditingController();
   final _reorderLevelController = TextEditingController();
   final _initialStockController = TextEditingController();
+  final _gstRateController = TextEditingController();
   bool _autoGenerateSku = true;
   bool _isCustomUnit = false;
 
@@ -72,6 +74,7 @@ class _AddItemDialogState extends State<AddItemDialog> {
     _costPriceController.dispose();
     _reorderLevelController.dispose();
     _initialStockController.dispose();
+    _gstRateController.dispose();
     super.dispose();
   }
 
@@ -296,10 +299,20 @@ class _AddItemDialogState extends State<AddItemDialog> {
 
     try {
       final provider = Provider.of<InventoryProvider>(context, listen: false);
+      final businessId = Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId;
+      debugPrint('AddItemDialog - Business ID from provider: $businessId');
+      
+      if (businessId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No business selected')),
+        );
+        return;
+      }
+
       final now = DateTime.now().toIso8601String();
 
       final newItem = InventoryItem(
-        businessId: provider.selectedBusinessId,
+        businessId: int.parse(businessId),
         name: _nameController.text,
         description: _descriptionController.text,
         sku: _skuController.text,
@@ -311,10 +324,12 @@ class _AddItemDialogState extends State<AddItemDialog> {
         weightedAverageCost: double.parse(_costPriceController.text),
         reorderLevel: int.parse(_reorderLevelController.text),
         currentStock: int.parse(_initialStockController.text),
+        gstRate: _gstRateController.text.isEmpty ? 0.0 : double.parse(_gstRateController.text),
         createdAt: now,
         updatedAt: now,
       );
 
+      debugPrint('AddItemDialog - Creating new item with business ID: ${newItem.businessId}');
       await provider.addItem(newItem);
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -445,10 +460,16 @@ class _AddItemDialogState extends State<AddItemDialog> {
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextFormField(
-                              'Barcode',
-                              _barcodeController,
-                              keyboardType: TextInputType.text,
+                            child: TextFormField(
+                              controller: _barcodeController,
+                              decoration: InputDecoration(
+                                labelText: 'Barcode',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[50],
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -468,65 +489,61 @@ class _AddItemDialogState extends State<AddItemDialog> {
                       _buildSkuField(),
                       const SizedBox(height: 16),
 
-                      _buildSectionTitle('Pricing'),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          SizedBox(
-                            width: isSmallScreen ? double.infinity : (dialogWidth - contentPadding * 3) / 2,
-                            child: _buildPriceFormField('Purchase Price', _costPriceController, context),
-                          ),
-                          SizedBox(
-                            width: isSmallScreen ? double.infinity : (dialogWidth - contentPadding * 3) / 2,
-                            child: _buildPriceFormField('Selling Price', _sellingPriceController, context),
-                          ),
-                        ],
-                      ),
+                      _buildSectionTitle('Pricing Information'),
                       const SizedBox(height: 16),
+                      _buildPriceFormField('Selling Price', _sellingPriceController, context),
+                      const SizedBox(height: 16),
+                      _buildPriceFormField('Cost Price', _costPriceController, context),
+                      const SizedBox(height: 16),
+                      _buildTextFormField(
+                        'GST Rate (%)',
+                        _gstRateController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return null; // GST rate is optional
+                          }
+                          final rate = double.tryParse(value);
+                          if (rate == null || rate < 0 || rate > 100) {
+                            return 'Please enter a valid GST rate between 0 and 100';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
 
                       _buildSectionTitle('Stock Information'),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          SizedBox(
-                            width: isSmallScreen ? double.infinity : (dialogWidth - contentPadding * 3) / 2,
-                            child: _buildTextFormField(
-                              'Initial Stock',
-                              _initialStockController,
-                              keyboardType: TextInputType.number,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter initial stock';
-                                }
-                                if (int.tryParse(value) == null) {
-                                  return 'Please enter a valid number';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          SizedBox(
-                            width: isSmallScreen ? double.infinity : (dialogWidth - contentPadding * 3) / 2,
-                            child: _buildTextFormField(
-                              'Reorder Level',
-                              _reorderLevelController,
-                              keyboardType: TextInputType.number,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter reorder level';
-                                }
-                                if (int.tryParse(value) == null) {
-                                  return 'Please enter a valid number';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 16),
+                      _buildTextFormField(
+                        'Initial Stock',
+                        _initialStockController,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter initial stock';
+                          }
+                          if (int.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
+                      _buildTextFormField(
+                        'Reorder Level',
+                        _reorderLevelController,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter reorder level';
+                          }
+                          if (int.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
 
                       _buildSectionTitle('Additional Information'),
                       Wrap(

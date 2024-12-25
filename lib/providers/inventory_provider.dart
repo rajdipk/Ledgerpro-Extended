@@ -15,33 +15,50 @@ class InventoryProvider with ChangeNotifier {
   // Getters
   List<InventoryItem> get items => _items;
   List<StockMovement> get movements => _movements;
-  List<PurchaseOrder> get purchaseOrders => 
-    List.from(_purchaseOrders)..sort((a, b) => 
-      DateTime.parse(b.orderDate).compareTo(DateTime.parse(a.orderDate)));
+  List<PurchaseOrder> get purchaseOrders => List.from(_purchaseOrders)
+    ..sort((a, b) =>
+        DateTime.parse(b.orderDate).compareTo(DateTime.parse(a.orderDate)));
   int get selectedBusinessId => _selectedBusinessId;
 
   // Set selected business
   void setSelectedBusiness(int businessId) {
+    debugPrint('InventoryProvider - Setting business ID: $businessId');
+    debugPrint('InventoryProvider - Current items: ${_items.length}');
+    debugPrint(
+        'InventoryProvider - Current items business IDs: ${_items.map((e) => e.businessId).toList()}');
     _selectedBusinessId = businessId;
     refreshInventory();
   }
 
   // Refresh all inventory data
   Future<void> refreshInventory() async {
+    debugPrint(
+        'InventoryProvider - Refreshing inventory for business: $_selectedBusinessId');
     await Future.wait([
       refreshItems(),
       refreshMovements(),
       refreshPurchaseOrders(),
     ]);
+    debugPrint(
+        'InventoryProvider - Inventory refreshed, items count: ${_items.length}');
+    debugPrint(
+        'InventoryProvider - Refreshed items business IDs: ${_items.map((e) => e.businessId).toList()}');
     notifyListeners();
   }
 
   // Inventory Items Methods
   Future<void> refreshItems() async {
+    debugPrint(
+        'InventoryProvider - Refreshing items for business: $_selectedBusinessId');
     _items = await _db.getInventoryItems(_selectedBusinessId);
+    debugPrint('InventoryProvider - Items refreshed, count: ${_items.length}');
+    debugPrint(
+        'InventoryProvider - Items business IDs: ${_items.map((e) => e.businessId).toList()}');
   }
 
   Future<void> addItem(InventoryItem item) async {
+    debugPrint(
+        'InventoryProvider - Adding item with business ID: ${item.businessId}');
     await _db.addInventoryItem(item);
     await refreshItems();
     notifyListeners();
@@ -130,7 +147,8 @@ class InventoryProvider with ChangeNotifier {
       // Calculate total amount received
       double totalReceived = items
           .where((item) => item.receivedQuantity > 0)
-          .fold(0, (sum, item) => sum + (item.unitPrice * item.receivedQuantity));
+          .fold(
+              0, (sum, item) => sum + (item.unitPrice * item.receivedQuantity));
 
       // Create a supplier transaction for the received amount
       if (totalReceived > 0) {
@@ -151,6 +169,18 @@ class InventoryProvider with ChangeNotifier {
       debugPrint('Error in receivePurchaseOrder: $e');
       rethrow;
     }
+  }
+
+  // Search items by name, SKU, or barcode
+  Future<List<InventoryItem>> searchItems(String query) async {
+    if (query.isEmpty) return [];
+    query = query.toLowerCase();
+    return _items
+        .where((item) =>
+            item.name.toLowerCase().contains(query) ||
+            item.sku!.toLowerCase().contains(query) ||
+            (item.barcode?.toLowerCase().contains(query) ?? false))
+        .toList();
   }
 
   // Helper Methods

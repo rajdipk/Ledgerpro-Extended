@@ -314,6 +314,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  void _showEditBusinessDialog(
+    BuildContext context,
+    Business business,
+    String field,
+    String title,
+  ) {
+    final TextEditingController controller = TextEditingController(
+      text: switch (field) {
+        'name' => business.name,
+        'address' => business.address,
+        'phone' => business.phone,
+        'gstin' => business.gstin,
+        _ => '',
+      },
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: field.substring(0, 1).toUpperCase() + field.substring(1),
+            border: const OutlineInputBorder(),
+          ),
+          textCapitalization: field == 'gstin' 
+            ? TextCapitalization.characters 
+            : TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newValue = controller.text.trim();
+              if (newValue.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Field cannot be empty'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final updatedBusiness = switch (field) {
+                'name' => business.copyWith(name: newValue),
+                'address' => business.copyWith(address: newValue),
+                'phone' => business.copyWith(phone: newValue),
+                'gstin' => business.copyWith(gstin: newValue.toUpperCase()),
+                _ => business,
+              };
+
+              await Provider.of<BusinessProvider>(context, listen: false)
+                  .updateBusiness(updatedBusiness);
+
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Business $field updated successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -432,8 +506,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Consumer<BusinessProvider>(
                 builder: (context, businessProvider, child) {
                   final businesses = businessProvider.businesses;
+                  final selectedBusiness = businesses.firstWhere(
+                    (business) => business.id == businessProvider.selectedBusinessId,
+                    orElse: () => Business(
+                      name: 'No business selected',
+                    ),
+                  );
+
                   return Column(
                     children: [
+                      // Business Details Section
+                      if (selectedBusiness.id != null) ...[
+                        _buildSettingsTile(
+                          context,
+                          title: 'Business Name',
+                          subtitle: selectedBusiness.name,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditBusinessDialog(
+                              context,
+                              selectedBusiness,
+                              'name',
+                              'Edit Business Name',
+                            ),
+                          ),
+                        ),
+                        _buildSettingsTile(
+                          context,
+                          title: 'Address',
+                          subtitle: selectedBusiness.address ?? 'Not set',
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditBusinessDialog(
+                              context,
+                              selectedBusiness,
+                              'address',
+                              'Edit Business Address',
+                            ),
+                          ),
+                        ),
+                        _buildSettingsTile(
+                          context,
+                          title: 'Phone',
+                          subtitle: selectedBusiness.phone ?? 'Not set',
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditBusinessDialog(
+                              context,
+                              selectedBusiness,
+                              'phone',
+                              'Edit Business Phone',
+                            ),
+                          ),
+                        ),
+                        _buildSettingsTile(
+                          context,
+                          title: 'GSTIN',
+                          subtitle: selectedBusiness.gstin ?? 'Not set',
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditBusinessDialog(
+                              context,
+                              selectedBusiness,
+                              'gstin',
+                              'Edit Business GSTIN',
+                            ),
+                          ),
+                        ),
+                        const Divider(),
+                      ],
                       _buildSettingsTile(
                         context,
                         title: 'Delete Business',

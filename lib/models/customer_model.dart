@@ -22,7 +22,7 @@ class Customer {
     this.gstin = '',
     this.balance = 0,
     this.lastTransactionDate,
-    this.transactions,
+    this.transactions, required int businessId,
   });
 
   factory Customer.fromMap(Map<String, dynamic> map) {
@@ -37,6 +37,7 @@ class Customer {
       lastTransactionDate: map['lastTransactionDate'] != null
           ? DateTime.parse(map['lastTransactionDate'])
           : null,
+      businessId: map['business_id'] as int,
     );
   }
 

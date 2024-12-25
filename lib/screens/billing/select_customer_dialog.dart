@@ -6,7 +6,7 @@ import '../../dialogs/add_customer_dialog.dart' as dialog;
 import '../../database/database_helper.dart';
 
 class SelectCustomerDialog extends StatefulWidget {
-  const SelectCustomerDialog({Key? key}) : super(key: key);
+  const SelectCustomerDialog({super.key});
 
   @override
   State<SelectCustomerDialog> createState() => _SelectCustomerDialogState();
@@ -26,7 +26,8 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
 
   Future<void> _loadCustomers() async {
     if (!mounted) return;
-    final businessProvider = Provider.of<BusinessProvider>(context, listen: false);
+    final businessProvider =
+        Provider.of<BusinessProvider>(context, listen: false);
     if (businessProvider.selectedBusinessId == null) return;
 
     final customerMaps = await DatabaseHelper.instance
@@ -47,6 +48,16 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
               customer.address.toLowerCase().contains(_searchQuery))
           .toList();
     });
+  }
+
+  Future<void> _addNewCustomer() async {
+    final wasAdded = await dialog.showAddCustomerDialog(context);
+    if (wasAdded == true && mounted) {
+      await _loadCustomers();
+      if (_searchController.text.isNotEmpty) {
+        _filterCustomers(_searchController.text);
+      }
+    }
   }
 
   @override
@@ -72,6 +83,12 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
                       ),
                 ),
                 const Spacer(),
+                FilledButton.icon(
+                  onPressed: _addNewCustomer,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Add New'),
+                ),
+                const SizedBox(width: 8),
                 IconButton.filledTonal(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close),
@@ -113,22 +130,32 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
                           const SizedBox(height: 16),
                           Text(
                             'No customers found',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
                                   color: Theme.of(context).colorScheme.outline,
                                 ),
                           ),
+                          if (_searchQuery.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Try adjusting your search',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.outline,
+                                  ),
+                            ),
+                          ],
+                          if (_searchQuery.isEmpty && _customers.isEmpty)
+                            Text(
+                              'Get started by adding your first customer',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.outline,
+                                  ),
+                            ),
                           const SizedBox(height: 8),
                           FilledButton.icon(
-                            onPressed: () {
-                              dialog.showAddCustomerDialog(context);
-                              // Since showAddCustomerDialog handles its own navigation and state management,
-                              // we'll just reload customers after a short delay to ensure the new customer is added
-                              Future.delayed(const Duration(milliseconds: 500)).then((_) {
-                                if (mounted) {
-                                  _loadCustomers();
-                                }
-                              });
-                            },
+                            onPressed: _addNewCustomer,
                             icon: const Icon(Icons.person_add),
                             label: const Text('Add New Customer'),
                           ),
@@ -142,18 +169,23 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
                         return Card(
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
                               child: Text(
                                 customer.name[0].toUpperCase(),
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                             title: Text(
                               customer.name,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,7 +196,9 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
                                       Icon(
                                         Icons.phone,
                                         size: 16,
-                                        color: Theme.of(context).colorScheme.secondary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
                                       ),
                                       const SizedBox(width: 4),
                                       Text(customer.phone),
@@ -176,7 +210,9 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
                                       Icon(
                                         Icons.location_on,
                                         size: 16,
-                                        color: Theme.of(context).colorScheme.secondary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
                                       ),
                                       const SizedBox(width: 4),
                                       Expanded(

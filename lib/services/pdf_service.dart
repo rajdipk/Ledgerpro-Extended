@@ -39,7 +39,8 @@ class PdfService {
           pw.SizedBox(height: 20),
           _buildItemsTable(order.items, items, currency, font, boldFont),
           pw.SizedBox(height: 20),
-          if (order.notes?.isNotEmpty ?? false) _buildNotes(order.notes!, font, boldFont),
+          if (order.notes?.isNotEmpty ?? false)
+            _buildNotes(order.notes!, font, boldFont),
           pw.SizedBox(height: 20),
           _buildTotal(order.items, currency, font, boldFont),
         ],
@@ -132,7 +133,8 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildSupplierInfo(Supplier supplier, pw.Font font, pw.Font boldFont) {
+  static pw.Widget _buildSupplierInfo(
+      Supplier supplier, pw.Font font, pw.Font boldFont) {
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.grey400),
@@ -169,7 +171,8 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildOrderInfo(PurchaseOrder order, pw.Font font, pw.Font boldFont) {
+  static pw.Widget _buildOrderInfo(
+      PurchaseOrder order, pw.Font font, pw.Font boldFont) {
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.grey400),
@@ -182,10 +185,21 @@ class PdfService {
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              _buildInfoRow('Order Date:', DateFormat('MMM dd, yyyy').format(DateTime.parse(order.orderDate)), font, boldFont),
+              _buildInfoRow(
+                  'Order Date:',
+                  DateFormat('MMM dd, yyyy')
+                      .format(DateTime.parse(order.orderDate)),
+                  font,
+                  boldFont),
               if (order.expectedDate != null)
-                _buildInfoRow('Expected Delivery:', DateFormat('MMM dd, yyyy').format(DateTime.parse(order.expectedDate!)), font, boldFont),
-              _buildInfoRow('Status:', order.status.toUpperCase(), font, boldFont),
+                _buildInfoRow(
+                    'Expected Delivery:',
+                    DateFormat('MMM dd, yyyy')
+                        .format(DateTime.parse(order.expectedDate!)),
+                    font,
+                    boldFont),
+              _buildInfoRow(
+                  'Status:', order.status.toUpperCase(), font, boldFont),
             ],
           ),
         ],
@@ -193,7 +207,8 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildInfoRow(String label, String value, pw.Font font, pw.Font boldFont) {
+  static pw.Widget _buildInfoRow(
+      String label, String value, pw.Font font, pw.Font boldFont) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(
@@ -242,12 +257,13 @@ class PdfService {
         ...orderItems.map((orderItem) {
           final item = items.firstWhere((i) => i.id == orderItem.itemId);
           final total = orderItem.quantity * orderItem.unitPrice;
-          
+
           return pw.TableRow(
             children: [
               _buildTableCell(item.name, font),
               _buildTableCell(orderItem.quantity.toString(), font),
-              _buildTableCell('$currency ${orderItem.unitPrice.toStringAsFixed(2)}', font),
+              _buildTableCell(
+                  '$currency ${orderItem.unitPrice.toStringAsFixed(2)}', font),
               _buildTableCell('$currency ${total.toStringAsFixed(2)}', font),
             ],
           );
@@ -301,7 +317,8 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildTotal(List<PurchaseOrderItem> items, String currency, pw.Font font, pw.Font boldFont) {
+  static pw.Widget _buildTotal(List<PurchaseOrderItem> items, String currency,
+      pw.Font font, pw.Font boldFont) {
     final total = items.fold<double>(
       0,
       (sum, item) => sum + (item.quantity * item.unitPrice),

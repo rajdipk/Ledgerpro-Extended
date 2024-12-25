@@ -1,5 +1,5 @@
 //customer_details.dart
-// ignore_for_file: unnecessary_string_interpolations
+// ignore_for_file: unnecessary_string_interpolations, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +13,7 @@ class CustomerDetailsDialog {
       builder: (BuildContext context) {
         final screenSize = MediaQuery.of(context).size;
         final isSmallScreen = screenSize.width < 600;
-        
+
         return Consumer<BusinessProvider>(
           builder: (context, provider, _) {
             return Dialog(
@@ -54,7 +54,8 @@ class CustomerDetailsDialog {
                                   message: 'Delete Customer',
                                   child: Icon(Icons.delete_outline_rounded),
                                 ),
-                                onPressed: () => _confirmDelete(context, customer),
+                                onPressed: () =>
+                                    _confirmDelete(context, customer),
                                 color: Colors.red[400],
                               )
                             ],
@@ -76,11 +77,15 @@ class CustomerDetailsDialog {
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                                 child: Container(
-                                  padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
+                                  padding:
+                                      EdgeInsets.all(isSmallScreen ? 16 : 24),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(15),
                                     gradient: LinearGradient(
-                                      colors: [Colors.teal.shade50, Colors.white],
+                                      colors: [
+                                        Colors.teal.shade50,
+                                        Colors.white
+                                      ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
@@ -93,18 +98,35 @@ class CustomerDetailsDialog {
                                           children: [
                                             Column(
                                               children: [
-                                                _buildDetailItem("Name", customer.name, Icons.person_outline_rounded),
-                                                _buildDetailItem("Phone", customer.phone, Icons.phone_outlined),
-                                                _buildDetailItem("Address", customer.address, Icons.location_on_outlined),
+                                                _buildDetailItem(
+                                                    "Name",
+                                                    customer.name,
+                                                    Icons
+                                                        .person_outline_rounded),
+                                                _buildDetailItem(
+                                                    "Phone",
+                                                    customer.phone,
+                                                    Icons.phone_outlined),
+                                                _buildDetailItem(
+                                                    "Address",
+                                                    customer.address,
+                                                    Icons.location_on_outlined),
                                               ],
                                             ),
                                             const SizedBox(height: 16),
                                             Column(
                                               children: [
-                                                _buildDetailItem("PAN", customer.pan, Icons.credit_card_outlined),
-                                                _buildDetailItem("GSTIN", customer.gstin, Icons.numbers_outlined),
+                                                _buildDetailItem(
+                                                    "PAN",
+                                                    customer.pan,
+                                                    Icons.credit_card_outlined),
+                                                _buildDetailItem(
+                                                    "GSTIN",
+                                                    customer.gstin,
+                                                    Icons.numbers_outlined),
                                                 const SizedBox(height: 8),
-                                                _buildBalanceItem(provider.selectedCustomerBalance),
+                                                _buildBalanceItem(provider
+                                                    .selectedCustomerBalance),
                                               ],
                                             ),
                                           ],
@@ -112,14 +134,26 @@ class CustomerDetailsDialog {
                                       else
                                         // Use row layout for larger screens
                                         Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Expanded(
                                               child: Column(
                                                 children: [
-                                                  _buildDetailItem("Name", customer.name, Icons.person_outline_rounded),
-                                                  _buildDetailItem("Phone", customer.phone, Icons.phone_outlined),
-                                                  _buildDetailItem("Address", customer.address, Icons.location_on_outlined),
+                                                  _buildDetailItem(
+                                                      "Name",
+                                                      customer.name,
+                                                      Icons
+                                                          .person_outline_rounded),
+                                                  _buildDetailItem(
+                                                      "Phone",
+                                                      customer.phone,
+                                                      Icons.phone_outlined),
+                                                  _buildDetailItem(
+                                                      "Address",
+                                                      customer.address,
+                                                      Icons
+                                                          .location_on_outlined),
                                                 ],
                                               ),
                                             ),
@@ -127,10 +161,18 @@ class CustomerDetailsDialog {
                                             Expanded(
                                               child: Column(
                                                 children: [
-                                                  _buildDetailItem("PAN", customer.pan, Icons.credit_card_outlined),
-                                                  _buildDetailItem("GSTIN", customer.gstin, Icons.numbers_outlined),
+                                                  _buildDetailItem(
+                                                      "PAN",
+                                                      customer.pan,
+                                                      Icons
+                                                          .credit_card_outlined),
+                                                  _buildDetailItem(
+                                                      "GSTIN",
+                                                      customer.gstin,
+                                                      Icons.numbers_outlined),
                                                   const SizedBox(height: 8),
-                                                  _buildBalanceItem(provider.selectedCustomerBalance),
+                                                  _buildBalanceItem(provider
+                                                      .selectedCustomerBalance),
                                                 ],
                                               ),
                                             ),
@@ -153,7 +195,8 @@ class CustomerDetailsDialog {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
                         ),
                         child: const Text('Close'),
                         onPressed: () => Navigator.of(context).pop(),
@@ -210,14 +253,18 @@ class CustomerDetailsDialog {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isPositive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+        color: isPositive
+            ? Colors.green.withOpacity(0.1)
+            : Colors.red.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+            isPositive
+                ? Icons.arrow_upward_rounded
+                : Icons.arrow_downward_rounded,
             color: isPositive ? Colors.green[700] : Colors.red[700],
             size: 20,
           ),

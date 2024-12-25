@@ -1,5 +1,8 @@
+// ignore_for_file: library_private_types_in_public_api
+
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../services/barcode_service.dart';
@@ -9,16 +12,16 @@ class BarcodeScannerDialog extends StatefulWidget {
   final Function(List<String>)? onMultiScan;
 
   const BarcodeScannerDialog({
-    Key? key,
+    super.key,
     this.continuousMode = false,
     this.onMultiScan,
-  }) : super(key: key);
+  });
 
   @override
   _BarcodeScannerDialogState createState() => _BarcodeScannerDialogState();
 }
 
-class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
+class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> with SingleTickerProviderStateMixin {
   MobileScannerController? _controller;
   bool _isProcessing = false;
   bool _torchEnabled = false;
@@ -26,17 +29,32 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
   final _audioPlayer = AudioPlayer();
   final _barcodeService = BarcodeService();
   final _manualController = TextEditingController();
+  String _scannedInput = '';
+  DateTime? _lastKeyTime;
+  late AnimationController _animationController;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
     _initializeScanner();
+    
+    // Initialize animation controller
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    // Create a curved animation
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
   }
 
   Future<void> _initializeScanner() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      setState(() {
-      });
+      setState(() {});
       return;
     }
 
@@ -49,8 +67,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
       await _controller?.start();
     } catch (e) {
       debugPrint('Error initializing scanner: $e');
-      setState(() {
-      });
+      setState(() {});
     }
   }
 
@@ -112,23 +129,30 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
     return Dialog(
       child: Container(
         width: 600,
-        height: 500,
+        height: isDesktop ? 300 : 500,
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.qr_code_scanner,
-                  color: Theme.of(context).colorScheme.primary,
+                ScaleTransition(
+                  scale: _animation,
+                  child: Icon(
+                    isDesktop ? Icons.keyboard : Icons.qr_code_scanner,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 40,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Scan Barcode',
+                  isDesktop ? 'Enter Barcode' : 'Scan Barcode',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -144,180 +168,239 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: MobileScanner(
-                      controller: _controller,
-                      onDetect: _onDetect,
+            if (!isDesktop) ...[
+              Expanded(
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: MobileScanner(
+                        controller: _controller,
+                        onDetect: _onDetect,
+                      ),
                     ),
-                  ),
-                  // Scanning overlay
-                  CustomPaint(
-                    painter: ScannerOverlayPainter(
-                      borderColor: Theme.of(context).colorScheme.primary,
-                      scanLineColor: Theme.of(context).colorScheme.secondary,
+                    CustomPaint(
+                      painter: ScannerOverlayPainter(
+                        borderColor: Theme.of(context).colorScheme.primary,
+                        scanLineColor: Theme.of(context).colorScheme.secondary,
+                      ),
+                      child: Container(),
                     ),
-                    child: Container(),
-                  ),
-                  // Scanned items list
-                  if (widget.continuousMode && _scannedBarcodes.isNotEmpty)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 16,
-                      child: Container(
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                    if (widget.continuousMode && _scannedBarcodes.isNotEmpty)
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 16,
+                        child: Container(
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outline
+                                  .withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'Scanned Items (${_scannedBarcodes.length})',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
+                                    ),
+                                    const Spacer(),
+                                    TextButton.icon(
+                                      onPressed: _scannedBarcodes.isEmpty
+                                          ? null
+                                          : () {
+                                              setState(() {
+                                                _scannedBarcodes.clear();
+                                              });
+                                            },
+                                      icon: const Icon(Icons.clear_all),
+                                      label: const Text('Clear All'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 8),
+                                  itemCount: _scannedBarcodes.length,
+                                  itemBuilder: (context, index) {
+                                    final item = _scannedBarcodes[index];
+                                    return Card(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      child: Container(
+                                        width: 200,
+                                        padding: const EdgeInsets.all(8),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    item,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.close,
+                                                      size: 16),
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _scannedBarcodes
+                                                          .removeAt(index);
+                                                    });
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Scanned Items (${_scannedBarcodes.length})',
-                                    style: Theme.of(context).textTheme.titleSmall,
-                                  ),
-                                  const Spacer(),
-                                  TextButton.icon(
-                                    onPressed: _scannedBarcodes.isEmpty
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _scannedBarcodes.clear();
-                                            });
-                                          },
-                                    icon: const Icon(Icons.clear_all),
-                                    label: const Text('Clear All'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                itemCount: _scannedBarcodes.length,
-                                itemBuilder: (context, index) {
-                                  final item = _scannedBarcodes[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(right: 8),
-                                    child: Container(
-                                      width: 200,
-                                      padding: const EdgeInsets.all(8),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  item,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(Icons.close, size: 16),
-                                                onPressed: () {
-                                                  setState(() {
-                                                    _scannedBarcodes.removeAt(index);
-                                                  });
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Manual entry
-            TextFormField(
-              controller: _manualController,
-              decoration: InputDecoration(
-                labelText: 'Manual Entry',
-                hintText: 'Enter barcode/SKU',
-                prefixIcon: const Icon(Icons.keyboard),
-                border: const OutlineInputBorder(),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_manualController.text.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _manualController.clear();
-                          setState(() {});
-                        },
-                      ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _manualController.text.isEmpty
-                          ? null
-                          : () => _onManualEntry(_manualController.text),
-                      icon: const Icon(Icons.search),
-                      label: const Text('Search'),
-                    ),
-                    const SizedBox(width: 8),
                   ],
                 ),
               ),
-              onFieldSubmitted: _onManualEntry,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _controller?.toggleTorch();
-                      setState(() {
-                        _torchEnabled = !_torchEnabled;
-                      });
-                    },
-                    icon: Icon(_torchEnabled ? Icons.flash_on : Icons.flash_off),
-                    label: Text(_torchEnabled ? 'Torch On' : 'Torch Off'),
+              const SizedBox(height: 16),
+            ],
+            if (isDesktop) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Use a barcode scanner or enter manually',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Simply scan your barcode - it will be detected automatically',
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+            ],
+            RawKeyboardListener(
+              focusNode: FocusNode()..requestFocus(),
+              onKey: (RawKeyEvent event) {
+                if (event is RawKeyDownEvent) {
+                  // Accumulate input if it's coming rapidly (likely from a scanner)
+                  if (_lastKeyTime != null &&
+                      DateTime.now().difference(_lastKeyTime!) <
+                          const Duration(milliseconds: 100)) {
+                    _scannedInput += event.character ?? '';
+                  } else {
+                    _scannedInput = event.character ?? '';
+                  }
+                  _lastKeyTime = DateTime.now();
+
+                  // Process accumulated input when Enter is pressed
+                  if (event.logicalKey.keyLabel == 'Enter' &&
+                      _scannedInput.isNotEmpty) {
+                    _onManualEntry(_scannedInput);
+                    _scannedInput = '';
+                  }
+                }
+              },
+              child: TextFormField(
+                controller: _manualController,
+                autofocus: isDesktop,
+                decoration: InputDecoration(
+                  labelText:
+                      isDesktop ? 'Scan or Enter Barcode' : 'Manual Entry',
+                  hintText: isDesktop
+                      ? 'Use scanner or type barcode/SKU'
+                      : 'Enter barcode/SKU',
+                  prefixIcon: const Icon(Icons.keyboard),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_manualController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _manualController.clear();
+                            setState(() {});
+                          },
+                        ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _manualController.text.isEmpty
+                            ? null
+                            : () => _onManualEntry(_manualController.text),
+                        icon: const Icon(Icons.search),
+                        label: const Text('Search'),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                   ),
                 ),
-                if (widget.continuousMode) ...[
-                  const SizedBox(width: 16),
+                onFieldSubmitted: _onManualEntry,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (!isDesktop)
+              Row(
+                children: [
                   Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _scannedBarcodes.isEmpty
-                          ? null
-                          : () {
-                              Navigator.of(context).pop(_scannedBarcodes);
-                            },
-                      icon: const Icon(Icons.check),
-                      label: const Text('Done'),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _controller?.toggleTorch();
+                        setState(() {
+                          _torchEnabled = !_torchEnabled;
+                        });
+                      },
+                      icon: Icon(
+                          _torchEnabled ? Icons.flash_on : Icons.flash_off),
+                      label: Text(_torchEnabled ? 'Torch On' : 'Torch Off'),
                     ),
                   ),
+                  if (widget.continuousMode) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _scannedBarcodes.isEmpty
+                            ? null
+                            : () {
+                                Navigator.of(context).pop(_scannedBarcodes);
+                              },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Done'),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              ),
           ],
         ),
       ),
@@ -326,6 +409,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
 
   @override
   void dispose() {
+    _animationController.dispose();
     _audioPlayer.dispose();
     if (_controller != null &&
         !Platform.isWindows &&

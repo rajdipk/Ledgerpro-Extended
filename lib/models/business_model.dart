@@ -68,4 +68,36 @@ class Business {
       settings: map['settings'] != null ? json.decode(map['settings']) : null,
     );
   }
+
+  Business copyWith({
+    String? id,
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+    String? gstin,
+    String? pan,
+    String? businessType,
+    String? createdAt,
+    String? updatedAt,
+    String? logo,
+    String? defaultCurrency,
+    Map<String, dynamic>? settings,
+  }) {
+    return Business(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      address: address ?? this.address,
+      gstin: gstin ?? this.gstin,
+      pan: pan ?? this.pan,
+      businessType: businessType ?? this.businessType,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: DateTime.now().toIso8601String(),
+      logo: logo ?? this.logo,
+      defaultCurrency: defaultCurrency ?? this.defaultCurrency,
+      settings: settings ?? this.settings,
+    );
+  }
 }

@@ -5,17 +5,21 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:provider/provider.dart'; 
+import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'models/bill_model.dart';
 import 'screens/authentication_screen.dart';
 import 'database/database_helper.dart';
+import 'screens/bills/bill_details_screen.dart';
+import 'screens/bills/bills_screen.dart';
 import 'screens/home_screen.dart';
-import 'providers/business_provider.dart'; 
-import 'providers/currency_provider.dart'; 
+import 'providers/business_provider.dart';
+import 'providers/currency_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/inventory_provider.dart';
 import 'providers/bill_provider.dart';
+import 'screens/navigation_panel.dart';
 import 'screens/settings.dart';
 import 'mannuals/user_manual_screen.dart';
 import 'screens/billing/billing_screen.dart';
@@ -34,7 +38,7 @@ Future<void> main() async {
         // Initialize window manager
         debugPrint('Initializing window manager...');
         await windowManager.ensureInitialized();
-        
+
         WindowOptions windowOptions = const WindowOptions(
           size: Size(1200, 800),
           minimumSize: Size(800, 600),
@@ -43,7 +47,7 @@ Future<void> main() async {
           skipTaskbar: false,
           titleBarStyle: TitleBarStyle.normal,
         );
-        
+
         await windowManager.waitUntilReadyToShow(windowOptions, () async {
           await windowManager.show();
           await windowManager.focus();
@@ -65,7 +69,7 @@ Future<void> main() async {
         MultiProvider(
           providers: [
             ChangeNotifierProvider(create: (_) => ThemeProvider()),
-            ChangeNotifierProvider(create: (_) => BusinessProvider()), 
+            ChangeNotifierProvider(create: (_) => BusinessProvider()),
             ChangeNotifierProvider(create: (_) => CurrencyProvider()),
             ChangeNotifierProvider(create: (_) => InventoryProvider()),
             ChangeNotifierProvider(create: (_) => BillProvider()),
@@ -76,7 +80,7 @@ Future<void> main() async {
     } catch (error, stackTrace) {
       debugPrint('Error during initialization: $error');
       debugPrint('Stack trace:\n$stackTrace');
-      
+
       // Show a more detailed error screen
       runApp(
         MaterialApp(
@@ -141,57 +145,11 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.themeMode,
           initialRoute: '/auth',
-          onGenerateRoute: (settings) {
-            switch (settings.name) {
-              case '/auth':
-                return PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => AuthenticationScreen(),
-                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                    const begin = Offset(0.0, 1.0);
-                    const end = Offset.zero;
-                    const curve = Curves.easeInOutCubic;
-                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                    var offsetAnimation = animation.drive(tween);
-                    return SlideTransition(position: offsetAnimation, child: child);
-                  },
-                  transitionDuration: const Duration(milliseconds: 800),
-                );
-              case '/home':
-                return PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(),
-                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                    const begin = Offset(1.0, 0.0);
-                    const end = Offset.zero;
-                    const curve = Curves.easeInOutCubic;
-                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                    var offsetAnimation = animation.drive(tween);
-                    return SlideTransition(position: offsetAnimation, child: child);
-                  },
-                  transitionDuration: const Duration(milliseconds: 800),
-                );
-              case '/billing':
-                return PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => const BillingScreen(),
-                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                    const begin = Offset(1.0, 0.0);
-                    const end = Offset.zero;
-                    const curve = Curves.easeInOutCubic;
-                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                    var offsetAnimation = animation.drive(tween);
-                    return SlideTransition(position: offsetAnimation, child: child);
-                  },
-                  transitionDuration: const Duration(milliseconds: 800),
-                );
-              default:
-                return MaterialPageRoute(builder: (_) => AuthenticationScreen());
-            }
-          },
           routes: {
             '/auth': (context) => AuthenticationScreen(),
             '/home': (context) => HomeScreen(),
             '/settings': (context) => const SettingsScreen(),
-            '/user-manual': (context) => const UserManualScreen(),
-            '/billing': (context) => const BillingScreen(),
+            '/manual': (context) => const UserManualScreen(),
           },
           builder: (context, child) {
             return ScrollConfiguration(

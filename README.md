@@ -6,8 +6,28 @@
 
 This is the extended version of LedgerPro with advanced features and complete implementation of inventory management, accounting, and business operations. This repository contains proprietary features and improvements.
 
-## Latest Updates (v2.0.0)
+## Latest Updates (v2.1.0)
 
+### Billing System Enhancements
+- **Improved Balance Summary**:
+  - Added delivery charge and discount fields
+  - Real-time total calculation with GST
+  - Interactive quantity editing with stock validation
+  - Save/Cancel functionality with proper error handling
+
+- **Bill Item Management**:
+  - Enhanced item list display with proper spacing
+  - Click-to-edit quantity feature
+  - Real-time price calculations
+  - Stock availability checks
+
+- **UI/UX Improvements**:
+  - Modern card-based design
+  - Themed buttons and icons
+  - Responsive layout
+  - Better error messages and feedback
+
+### Previous Updates (v2.0.0)
 ### Authentication Improvements
 - Enhanced password field functionality
 - Improved focus management

@@ -15,12 +15,20 @@ import '../screens/supplier_operations_screen.dart';
 import 'inventory/inventory_screen.dart';
 import 'billing/billing_screen.dart';
 
+mixin HomeScreenNavigation {
+  void switchContent(Widget newContent, [String route = '/']);
+}
+
 class HomeScreen extends StatefulWidget {
+  static HomeScreenNavigation of(BuildContext context) {
+    return context.findAncestorStateOfType<_HomeScreenState>()!;
+  }
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with HomeScreenNavigation {
   Widget _currentContent = const HomeScreenDesign();
   String _currentRoute = '/';
 
@@ -33,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _switchContent(Widget newContent, [String route = '/']) {
+  @override
+  void switchContent(Widget newContent, [String route = '/']) {
     if (_currentRoute == route) return;
     setState(() {
       _currentContent = newContent;
@@ -106,11 +115,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ? Drawer(
               child: NavigationPanel(
                 onLogout: () => _handleLogout(context),
-                onSettings: () => _switchContent(const SettingsScreen(), '/settings'),
-                onCustomers: () => _switchContent(const CustomerOperationsScreen(), '/customers'),
-                onSuppliers: () => _switchContent(const SupplierOperationsScreen(), '/suppliers'),
-                onInventory: () => _switchContent(const InventoryScreen(), '/inventory'),
-                onBilling: () => _switchContent(const BillingScreen(), '/billing'),
+                onSettings: () =>
+                    switchContent(const SettingsScreen(), '/settings'),
+                onCustomers: () => switchContent(
+                    const CustomerOperationsScreen(), '/customers'),
+                onSuppliers: () => switchContent(
+                    const SupplierOperationsScreen(), '/suppliers'),
+                onInventory: () =>
+                    switchContent(const InventoryScreen(), '/inventory'),
+                onBilling: () =>
+                    switchContent(const BillingScreen(), '/billing'),
               ),
             )
           : null,
@@ -121,11 +135,16 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 300,
               child: NavigationPanel(
                 onLogout: () => _handleLogout(context),
-                onSettings: () => _switchContent(const SettingsScreen(), '/settings'),
-                onCustomers: () => _switchContent(const CustomerOperationsScreen(), '/customers'),
-                onSuppliers: () => _switchContent(const SupplierOperationsScreen(), '/suppliers'),
-                onInventory: () => _switchContent(const InventoryScreen(), '/inventory'),
-                onBilling: () => _switchContent(const BillingScreen(), '/billing'),
+                onSettings: () =>
+                    switchContent(const SettingsScreen(), '/settings'),
+                onCustomers: () => switchContent(
+                    const CustomerOperationsScreen(), '/customers'),
+                onSuppliers: () => switchContent(
+                    const SupplierOperationsScreen(), '/suppliers'),
+                onInventory: () =>
+                    switchContent(const InventoryScreen(), '/inventory'),
+                onBilling: () =>
+                    switchContent(const BillingScreen(), '/billing'),
               ),
             ),
           Expanded(

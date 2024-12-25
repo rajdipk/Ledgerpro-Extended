@@ -16,6 +16,7 @@ class NavigationPanel extends StatefulWidget {
   final VoidCallback onSuppliers;
   final VoidCallback onInventory;
   final VoidCallback onBilling;
+  final bool isMainNavigation;
 
   const NavigationPanel({
     super.key,
@@ -25,6 +26,7 @@ class NavigationPanel extends StatefulWidget {
     required this.onLogout,
     required this.onInventory,
     required this.onBilling,
+    this.isMainNavigation = false,
   });
 
   @override
@@ -76,7 +78,8 @@ class _NavigationPanelState extends State<NavigationPanel> {
         width: 304, // Standard drawer width
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.horizontal(right: Radius.circular(24)),
+          borderRadius:
+              const BorderRadius.horizontal(right: Radius.circular(24)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -125,14 +128,20 @@ class _NavigationPanelState extends State<NavigationPanel> {
                             ),
                           ],
                         ),
-                        child: Hero(
-                          tag: 'app_logo',
-                          child: Image.asset(
-                            'assets/images/accounting.png',
-                            width: 60,
-                            height: 60,
-                          ),
-                        ),
+                        child: widget.isMainNavigation
+                            ? Hero(
+                                tag: 'app_logo',
+                                child: Image.asset(
+                                  'assets/images/accounting.png',
+                                  width: 60,
+                                  height: 60,
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/images/accounting.png',
+                                width: 60,
+                                height: 60,
+                              ),
                       ),
                       const SizedBox(width: 12),
                       const Text(
@@ -198,7 +207,8 @@ class _NavigationPanelState extends State<NavigationPanel> {
                   decoration: const InputDecoration(),
                   isExpanded: true,
                   value: selectedBusiness,
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.teal),
+                  icon:
+                      const Icon(Icons.keyboard_arrow_down, color: Colors.teal),
                   elevation: 3,
                   style: const TextStyle(
                     color: Colors.black87,
@@ -326,7 +336,8 @@ class _NavigationPanelState extends State<NavigationPanel> {
         text: 'Customers',
         trailing: businessProvider.customerCount > 0
             ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade100,
                   borderRadius: BorderRadius.circular(20),
@@ -352,7 +363,8 @@ class _NavigationPanelState extends State<NavigationPanel> {
         text: 'Suppliers',
         trailing: businessProvider.supplierCount > 0
             ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade100,
                   borderRadius: BorderRadius.circular(20),

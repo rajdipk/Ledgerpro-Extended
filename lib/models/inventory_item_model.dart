@@ -14,6 +14,7 @@ class InventoryItem {
   final double weightedAverageCost;
   final int currentStock;
   final int reorderLevel;
+  final double gstRate;
   final String createdAt;
   final String updatedAt;
   final List<InventoryBatch> batches;
@@ -32,6 +33,7 @@ class InventoryItem {
     this.weightedAverageCost = 0.0,
     required this.currentStock,
     required this.reorderLevel,
+    this.gstRate = 0.0,
     required this.createdAt,
     required this.updatedAt,
     this.batches = const [],
@@ -52,6 +54,7 @@ class InventoryItem {
       'weighted_average_cost': weightedAverageCost,
       'current_stock': currentStock,
       'reorder_level': reorderLevel,
+      'gst_rate': gstRate,
       'created_at': createdAt,
       'updated_at': updatedAt,
     };
@@ -72,6 +75,7 @@ class InventoryItem {
       weightedAverageCost: map['weighted_average_cost'] as double? ?? map['cost_price'] as double,
       currentStock: map['current_stock'] as int,
       reorderLevel: map['reorder_level'] as int,
+      gstRate: map['gst_rate'] as double? ?? 0.0,
       createdAt: map['created_at'] as String,
       updatedAt: map['updated_at'] as String,
       batches: batches,
@@ -118,6 +122,7 @@ class InventoryItem {
     double? weightedAverageCost,
     int? currentStock,
     int? reorderLevel,
+    double? gstRate,
     String? createdAt,
     String? updatedAt,
     List<InventoryBatch>? batches,
@@ -136,6 +141,7 @@ class InventoryItem {
       weightedAverageCost: weightedAverageCost ?? this.weightedAverageCost,
       currentStock: currentStock ?? this.currentStock,
       reorderLevel: reorderLevel ?? this.reorderLevel,
+      gstRate: gstRate ?? this.gstRate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       batches: batches ?? this.batches,

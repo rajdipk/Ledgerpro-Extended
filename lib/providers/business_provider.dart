@@ -32,7 +32,10 @@ class BusinessProvider with ChangeNotifier {
   List<Business> get businesses => _businesses;
   List<FlSpot> get dailyBalances => _dailyBalances;
   bool get isPasswordValid => _isPasswordValid;
-  String? get selectedBusinessId => _selectedBusinessId;
+  String? get selectedBusinessId {
+    debugPrint('BusinessProvider - Getting selected business ID: $_selectedBusinessId');
+    return _selectedBusinessId;
+  }
   Customer? get selectedCustomer => _selectedCustomer;
   Supplier? get selectedSupplier => _selectedSupplier;
 
@@ -563,5 +566,28 @@ class BusinessProvider with ChangeNotifier {
     await calculateBalances();
 
     notifyListeners();
+  }
+
+  Future<void> updateBusiness(Business business) async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      await db.update(
+        'businesses',
+        business.toMap(),
+        where: 'id = ?',
+        whereArgs: [business.id],
+      );
+
+      final index = _businesses.indexWhere((b) => b.id == business.id);
+      if (index != -1) {
+        _businesses[index] = business;
+        notifyListeners();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating business: $e');
+      }
+      rethrow;
+    }
   }
 }

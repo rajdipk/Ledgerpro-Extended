@@ -15,6 +15,7 @@ import 'purchase_order_details_dialog.dart';
 import '../../widgets/barcode_scanner_dialog.dart';
 import '../../services/sound_service.dart';
 import 'stock_movements_screen.dart'; // Import the new screen
+import '../../providers/business_provider.dart'; // Import BusinessProvider
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -35,8 +36,17 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      debugPrint('InventoryScreen - Initializing');
+      final businessId = Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId;
+      debugPrint('InventoryScreen - Selected Business ID: $businessId');
+      if (businessId != null) {
+        final provider = Provider.of<InventoryProvider>(context, listen: false);
+        provider.setSelectedBusiness(int.parse(businessId));
+        debugPrint('InventoryScreen - Set business ID and refreshed inventory');
+      }
       final provider = Provider.of<InventoryProvider>(context, listen: false);
       await provider.refreshInventory();
+      debugPrint('InventoryScreen - Inventory refreshed');
       if (mounted) {
         setState(() {
           _isInitialized = true;

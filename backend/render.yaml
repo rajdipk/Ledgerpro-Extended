@@ -2,8 +2,9 @@ services:
   - type: web
     name: ledgerpro-backend
     env: node
-    buildCommand: npm install
-    startCommand: node src/index.js
+    rootDir: backend
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node src/index.js
     envVars:
       - key: NODE_ENV
         value: production

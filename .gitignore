@@ -37,7 +37,14 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Android signing
+android/app/ledgerpro.keystore
+android/keystore_base64.txt
+android/gradle.properties
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
 /android/app/release
+dist/
+android/app/build/

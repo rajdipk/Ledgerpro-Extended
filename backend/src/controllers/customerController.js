@@ -2,8 +2,16 @@ const Customer = require('../models/customer');
 const LicenseManager = require('../utils/license');
 const emailService = require('../services/emailService');
 const razorpayService = require('../services/razorpayService');
+const config = require('../config/config');
 
 const licenseManager = new LicenseManager(process.env.LICENSE_KEY_SECRET);
+
+// Helper function to get latest release download URL
+const getDownloadUrl = (platform, version = 'latest') => {
+    const baseUrl = `https://github.com/rajdipk/LedgerPro/releases/download`;
+    const fileName = platform === 'windows' ? 'LedgerPro-Setup.exe' : 'LedgerPro.apk';
+    return `${baseUrl}/${version}/${fileName}`;
+};
 
 exports.register = async (req, res) => {
     try {
@@ -14,7 +22,7 @@ exports.register = async (req, res) => {
             platform,
             businessNeeds,
             licenseType,
-            phone // Optional phone number for Razorpay
+            phone
         } = req.body;
 
         // Create customer in database
@@ -43,9 +51,7 @@ exports.register = async (req, res) => {
                 data: {
                     licenseKey: customer.license.key,
                     expiryDate: customer.license.endDate,
-                    downloadUrl: customer.platform === 'windows' 
-                        ? '/downloads/LedgerPro-Setup.exe'
-                        : '/downloads/LedgerPro.apk'
+                    downloadUrl: getDownloadUrl(customer.platform)
                 }
             });
         }
@@ -126,9 +132,7 @@ exports.verifyPayment = async (req, res) => {
             data: {
                 licenseKey: customer.license.key,
                 expiryDate: customer.license.endDate,
-                downloadUrl: customer.platform === 'windows' 
-                    ? '/downloads/LedgerPro-Setup.exe'
-                    : '/downloads/LedgerPro.apk'
+                downloadUrl: getDownloadUrl(customer.platform)
             }
         });
 

@@ -8,7 +8,8 @@
     "dev": "nodemon src/index.js",
     "test": "jest",
     "test:db": "node src/scripts/testConnection.js",
-    "test:razorpay": "node src/scripts/testRazorpay.js"
+    "test:razorpay": "node src/scripts/testRazorpay.js",
+    "build": "npm install"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

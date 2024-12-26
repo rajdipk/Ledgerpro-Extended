@@ -2,7 +2,6 @@ services:
   - type: web
     name: ledgerpro-backend
     env: node
-    rootDir: backend
     buildCommand: cd backend && npm install
     startCommand: cd backend && node src/index.js
     envVars:
@@ -11,7 +10,7 @@ services:
       - key: PORT
         value: 3000
       - key: MONGODB_URI
-        sync: false # Will be set manually in Render dashboard
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRES_IN

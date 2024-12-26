@@ -578,13 +578,25 @@
             const form = event.target;
             const formData = new FormData(form);
             const data = Object.fromEntries(formData);
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
 
             try {
                 // Show loading state
-                const submitBtn = form.querySelector('button[type="submit"]');
-                const originalText = submitBtn.innerHTML;
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Processing...';
+
+                // Check if backend is available first
+                try {
+                    const healthCheck = await fetch('http://localhost:3000/api/health', {
+                        method: 'GET'
+                    });
+                    if (!healthCheck.ok) {
+                        throw new Error('Backend server is not available');
+                    }
+                } catch (error) {
+                    throw new Error('Backend server is not running. Please start the backend server first.');
+                }
 
                 const response = await fetch('http://localhost:3000/api/customers/register', {
                     method: 'POST',
@@ -595,7 +607,8 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Registration failed');
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Registration failed');
                 }
 
                 const result = await response.json();
@@ -674,9 +687,8 @@
                 alert('There was an error processing your request. Please try again.');
             } finally {
                 // Reset button state
-                const submitBtn = form.querySelector('button[type="submit"]');
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = originalText;
+                submitBtn.innerHTML = originalBtnText;
             }
         }
 

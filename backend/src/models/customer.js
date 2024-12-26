@@ -13,6 +13,11 @@ const customerSchema = new mongoose.Schema({
         trim: true,
         lowercase: true
     },
+    phone: {
+        type: String,
+        required: true,
+        trim: true
+    },
     industry: {
         type: String,
         required: true,
@@ -75,11 +80,8 @@ const customerSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Index for license key lookups
-customerSchema.index({ 'license.key': 1 });
-
-// Index for email lookups
-customerSchema.index({ email: 1 });
+// Create compound index for email and license key
+customerSchema.index({ email: 1, 'license.key': 1 });
 
 // Methods
 customerSchema.methods.isLicenseValid = function() {

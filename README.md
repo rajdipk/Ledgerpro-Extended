@@ -89,6 +89,58 @@ This is the extended version of LedgerPro with advanced features and complete im
   - Supplier performance reports
   - Custom report generation
 
+## Releases
+
+LedgerPro releases are managed through GitHub Releases. Each release includes:
+- Windows installer (LedgerPro-Setup.exe)
+- Android APK (LedgerPro.apk)
+
+### Creating a New Release
+
+1. Run the release script:
+   ```bash
+   node scripts/create-release.js
+   ```
+
+2. Follow the prompts to:
+   - Enter the new version number
+   - Add changelog entries
+   - Confirm the release
+
+3. The script will:
+   - Update package.json version
+   - Update CHANGELOG.md
+   - Create a git tag
+   - Push changes to GitHub
+
+4. GitHub Actions will automatically:
+   - Build the Windows installer
+   - Build the Android APK
+   - Create a GitHub Release
+   - Upload the build artifacts
+
+### Release Requirements
+
+#### Windows Build
+- Node.js 18 or later
+- electron-builder
+
+#### Android Build
+- Java JDK 11
+- Android SDK
+- Gradle
+
+### Security
+
+Release builds are signed using:
+- Windows: Code signing certificate (optional)
+- Android: Release keystore (required)
+
+Configure the following secrets in your GitHub repository:
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
 ## Development Guidelines
 
 ### Branch Structure

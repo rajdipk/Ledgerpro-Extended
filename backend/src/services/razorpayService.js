@@ -9,7 +9,7 @@ class RazorpayService {
         });
 
         this.prices = {
-            professional: 79900, // ₹799 in paise
+            professional: 1000, // $10 in cents
             enterprise: 0 // Custom pricing
         };
     }
@@ -22,7 +22,7 @@ class RazorpayService {
 
         const options = {
             amount,
-            currency: 'INR',
+            currency: 'USD',
             receipt: `order_${customerId}`,
             notes: {
                 customerId,

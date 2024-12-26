@@ -7,6 +7,9 @@ class Transaction {
   final double amount;
   final String date; // Consider changing this to DateTime
   late final double balance;
+  final String? notes;
+  final String? referenceType;
+  final int? referenceId;
 
   Transaction({
     this.id,
@@ -15,6 +18,9 @@ class Transaction {
     required this.amount,
     required this.date,
     required this.balance,
+    this.notes,
+    this.referenceType,
+    this.referenceId,
   });
 
   // Converts the Transaction instance to a Map for database storage
@@ -26,6 +32,9 @@ class Transaction {
       'amount': amount, // Map the amount
       'date': date, // Map the date (consider DateTime)
       'balance': balance, // Map the balance
+      if (notes != null) 'notes': notes,
+      if (referenceType != null) 'reference_type': referenceType,
+      if (referenceId != null) 'reference_id': referenceId,
     };
   }
 }

@@ -33,15 +33,19 @@ class TransactionDetailsScreen extends StatefulWidget {
 
 class _TransactionDetailsScreenState extends State<TransactionDetailsScreen> {
   late final BusinessProvider _businessProvider;
+  bool _isInitialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _businessProvider = Provider.of<BusinessProvider>(context, listen: false);
-    Future.microtask(() async {
-      await _businessProvider.setSelectedCustomerById(widget.customerId);
-      await _businessProvider.refreshTransactions(widget.customerId);
-    });
+     if (!_isInitialized) {
+      _businessProvider = Provider.of<BusinessProvider>(context, listen: false);
+      Future.microtask(() async {
+        await _businessProvider.setSelectedCustomerById(widget.customerId);
+        await _businessProvider.refreshTransactions(widget.customerId);
+      });
+      _isInitialized = true;
+    }
   }
 
   String _getDateLabel(DateTime txnDate) {

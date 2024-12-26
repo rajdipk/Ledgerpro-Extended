@@ -56,13 +56,50 @@ class Supplier {
       'pan': pan,
       'gstin': gstin,
       'balance': balance,
+      if (lastTransactionDate != null)
+        'lastTransactionDate': lastTransactionDate!.toIso8601String(),
     };
-    
-    // Only include id if it's not 0 (for updates)
     if (id != 0) {
       map['id'] = id;
     }
-    
     return map;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Supplier && 
+           other.id == id &&
+           other.businessId == businessId &&
+           other.name == name;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, businessId, name);
+
+  Supplier copyWith({
+    int? id,
+    int? businessId,
+    String? name,
+    String? phone,
+    String? address,
+    String? pan,
+    String? gstin,
+    double? balance,
+    DateTime? lastTransactionDate,
+    List<Transaction>? transactions,
+  }) {
+    return Supplier(
+      id: id ?? this.id,
+      businessId: businessId ?? this.businessId,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      pan: pan ?? this.pan,
+      gstin: gstin ?? this.gstin,
+      balance: balance ?? this.balance,
+      lastTransactionDate: lastTransactionDate ?? this.lastTransactionDate,
+      transactions: transactions ?? this.transactions,
+    );
   }
 }

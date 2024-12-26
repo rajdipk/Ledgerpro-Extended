@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ledgerpro/screens/inventory_coming_soon_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 
@@ -11,17 +10,27 @@ import '../providers/business_provider.dart';
 import 'home_screen_design.dart';
 import 'navigation_panel.dart';
 import 'settings.dart';
-import 'customer_operations_screen.dart';
-import 'supplier_operations_screen.dart';
+import '../screens/customer_operations_screen.dart';
+import '../screens/supplier_operations_screen.dart';
+import 'inventory/inventory_screen.dart';
+import 'billing/billing_screen.dart';
+
+mixin HomeScreenNavigation {
+  void switchContent(Widget newContent, [String route = '/']);
+}
 
 class HomeScreen extends StatefulWidget {
+  static HomeScreenNavigation of(BuildContext context) {
+    return context.findAncestorStateOfType<_HomeScreenState>()!;
+  }
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-
-  Widget _currentContent = const HomeScreenDesign(); // Use HomeScreenDesign here
+class _HomeScreenState extends State<HomeScreen> with HomeScreenNavigation {
+  Widget _currentContent = const HomeScreenDesign();
+  String _currentRoute = '/';
 
   void _handleLogout(BuildContext context) {
     Navigator.of(context).pushReplacementNamed('/auth');
@@ -32,21 +41,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _switchContent(Widget newContent) {
+  @override
+  void switchContent(Widget newContent, [String route = '/']) {
+    if (_currentRoute == route) return;
     setState(() {
       _currentContent = newContent;
+      _currentRoute = route;
     });
-    // Any additional logic to handle business selection can go here
   }
 
   @override
   Widget build(BuildContext context) {
-    // Access the BusinessProvider instance using Provider.of
-    final businessProvider = Provider.of<BusinessProvider>(context);
-    // Retrieve the selected business ID from the provider
-    // ignore: unused_local_variable
-    String? selectedBusinessId = businessProvider.selectedBusinessId;
-    
+    Provider.of<BusinessProvider>(context);
     bool isSmallScreen = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
@@ -109,10 +115,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ? Drawer(
               child: NavigationPanel(
                 onLogout: () => _handleLogout(context),
-                onSettings: () => _switchContent(const SettingsScreen()),
-                onCustomers: () => _switchContent(const CustomerOperationsScreen()),
-                onSuppliers: () => _switchContent(const SupplierOperationsScreen()),
-                onInventory: ()=> _switchContent(const InventoryComingSoonScreen()),
+                onSettings: () =>
+                    switchContent(const SettingsScreen(), '/settings'),
+                onCustomers: () => switchContent(
+                    const CustomerOperationsScreen(), '/customers'),
+                onSuppliers: () => switchContent(
+                    const SupplierOperationsScreen(), '/suppliers'),
+                onInventory: () =>
+                    switchContent(const InventoryScreen(), '/inventory'),
+                onBilling: () =>
+                    switchContent(const BillingScreen(), '/billing'),
               ),
             )
           : null,
@@ -123,10 +135,16 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 300,
               child: NavigationPanel(
                 onLogout: () => _handleLogout(context),
-                onSettings: () => _switchContent(const SettingsScreen()),
-                onCustomers: () => _switchContent(const CustomerOperationsScreen()),
-                onSuppliers: () =>_switchContent(const SupplierOperationsScreen()),
-                onInventory: ()=> _switchContent(const InventoryComingSoonScreen()),
+                onSettings: () =>
+                    switchContent(const SettingsScreen(), '/settings'),
+                onCustomers: () => switchContent(
+                    const CustomerOperationsScreen(), '/customers'),
+                onSuppliers: () => switchContent(
+                    const SupplierOperationsScreen(), '/suppliers'),
+                onInventory: () =>
+                    switchContent(const InventoryScreen(), '/inventory'),
+                onBilling: () =>
+                    switchContent(const BillingScreen(), '/billing'),
               ),
             ),
           Expanded(

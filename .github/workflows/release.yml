@@ -7,14 +7,16 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: windows-latest # Using Windows runner for both builds
+    runs-on: windows-latest
     permissions:
-      contents: write # Required for creating releases
+      contents: write
     
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Required for getting all tags
+          fetch-depth: 0
+          repository: rajdipk/Ledgerpro-Extended
+          ref: main
       
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -28,11 +30,16 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
+      - name: Decode Keystore
+        env:
+          ENCODED_KEYSTORE: ${{ secrets.ENCODED_KEYSTORE }}
+        run: |
+          echo $env:ENCODED_KEYSTORE | base64 -d > android/app/ledgerpro.keystore
+
       - name: Install dependencies
         run: |
           npm ci
-          npm install -g electron-builder
-          npm install -g @ionic/cli
+          npm install -g electron-builder @ionic/cli
 
       - name: Get version from tag
         id: get_version
@@ -69,14 +76,19 @@ jobs:
             # LedgerPro ${{ env.VERSION }}
             
             ## What's New
-            - List your changes here
+            - See CHANGELOG.md for details
             
             ## Downloads
             - Windows: LedgerPro-Setup.exe
-            - Android: app-release.apk (renamed to LedgerPro.apk)
+            - Android: LedgerPro.apk
+            
+            ## Branches Updated
+            - main
+            - feature/billing-system
+            - feature/inventory-management-extended
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Rename Android APK
+      - name: Rename and Upload Android APK
         run: |
           mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/LedgerPro.apk

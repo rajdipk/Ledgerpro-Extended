@@ -1,73 +1,98 @@
-# PowerShell script to set up Android signing
-$ErrorActionPreference = "Stop"
+# Android Keystore Generation Script
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$KeystorePassword,
+    
+    [Parameter(Mandatory=$true)]
+    [string]$KeyAlias,
+    
+    [Parameter(Mandatory=$true)]
+    [string]$KeyPassword
+)
 
-# Create directories if they don't exist
-New-Item -ItemType Directory -Force -Path "android/app" | Out-Null
-
-# Define variables
-$STORE_PASSWORD = "ledgerpro2024"
-$KEY_ALIAS = "ledgerpro"
-$KEY_PASSWORD = "ledgerpro2024"
-$KEYSTORE_PATH = "android/app/ledgerpro.keystore"
-
-# Find Java installation
-$javaHome = $env:JAVA_HOME
-if (-not $javaHome) {
-    Write-Host "JAVA_HOME not set. Searching for Java installation..."
-    $javaPath = Get-Command java -ErrorAction SilentlyContinue
-    if ($javaPath) {
-        $javaHome = (Get-Item $javaPath.Source).Directory.Parent.FullName
-        Write-Host "Found Java at: $javaHome"
-    } else {
-        Write-Host "Java not found. Please install JDK and set JAVA_HOME"
-        exit 1
-    }
+# Find Java Home and keytool
+$javaHome = if ($env:JAVA_HOME) {
+    $env:JAVA_HOME
+} elseif (Test-Path "C:\Program Files\Java") {
+    Get-ChildItem "C:\Program Files\Java" -Directory | 
+    Where-Object { $_.Name -like "jdk*" } |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1 |
+    ForEach-Object { $_.FullName }
+} elseif (Test-Path "C:\Program Files\Common Files\Oracle\Java\javapath\java.exe") {
+    (Get-Item "C:\Program Files\Common Files\Oracle\Java\javapath\java.exe").Directory.Parent.Parent.FullName
+} else {
+    throw "Java installation not found. Please install JDK or set JAVA_HOME environment variable."
 }
 
-$keytool = Join-Path $javaHome "bin\keytool.exe"
-if (-not (Test-Path $keytool)) {
-    Write-Host "keytool not found at: $keytool"
-    exit 1
+$keytoolPath = Join-Path $javaHome "bin\keytool.exe"
+if (-not (Test-Path $keytoolPath)) {
+    throw "keytool not found at: $keytoolPath"
 }
 
-# Generate keystore
+Write-Host "Found keytool at: $keytoolPath"
+
+$keystorePath = "..\android\app\ledgerpro.keystore"
+$validity = "10000" # Validity in days
+
+# Create the android directory if it doesn't exist
+New-Item -ItemType Directory -Force -Path "..\android\app"
+
+# Remove existing keystore if it exists
+if (Test-Path $keystorePath) {
+    Remove-Item $keystorePath -Force
+    Write-Host "Removed existing keystore"
+}
+
+# Generate the keystore
+$keytoolArgs = @(
+    "-genkeypair",
+    "-v",
+    "-storetype", "PKCS12",
+    "-keystore", $keystorePath,
+    "-alias", $KeyAlias,
+    "-keyalg", "RSA",
+    "-keysize", "2048",
+    "-validity", $validity,
+    "-storepass", $KeystorePassword,
+    "-keypass", $KeyPassword,
+    "-dname", "CN=LedgerPro, OU=Development, O=Rajdip Kumar, L=Kolkata, S=West Bengal, C=IN"
+)
+
 Write-Host "Generating keystore..."
-& $keytool -genkey -v `
-    -keystore $KEYSTORE_PATH `
-    -alias $KEY_ALIAS `
-    -keyalg RSA `
-    -keysize 2048 `
-    -validity 10000 `
-    -storepass $STORE_PASSWORD `
-    -keypass $KEY_PASSWORD `
-    -dname "CN=LedgerPro, OU=Development, O=Rajdip Kumar, L=Kolkata, S=West Bengal, C=IN"
+Write-Host "Command: $keytoolPath $($keytoolArgs -join ' ')"
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to generate keystore"
+& $keytoolPath $keytoolArgs
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "`nKeystore generated successfully at: $keystorePath"
+    Write-Host "`nStore these values securely. You'll need them for GitHub Secrets:`n"
+    Write-Host "ANDROID_KEYSTORE_PASSWORD=$KeystorePassword"
+    Write-Host "ANDROID_KEY_ALIAS=$KeyAlias"
+    Write-Host "ANDROID_KEY_PASSWORD=$KeyPassword"
+    
+    # Add keystore path to .gitignore if not already present
+    $gitignorePath = "..\\.gitignore"
+    $keystoreIgnoreLine = "android/app/ledgerpro.keystore"
+    
+    if (!(Test-Path $gitignorePath)) {
+        New-Item -ItemType File -Path $gitignorePath
+    }
+    
+    $gitignoreContent = Get-Content $gitignorePath
+    if ($gitignoreContent -notcontains $keystoreIgnoreLine) {
+        Add-Content $gitignorePath "`n# Android signing`n$keystoreIgnoreLine"
+        Write-Host "`nAdded keystore to .gitignore"
+    }
+
+    # Generate Base64 encoded keystore
+    $keystoreBytes = Get-Content -Path $keystorePath -Raw -Encoding Byte
+    $encodedKeystore = [Convert]::ToBase64String($keystoreBytes)
+    $encodedKeystorePath = "encoded_keystore.txt"
+    Set-Content -Path $encodedKeystorePath -Value $encodedKeystore
+    Write-Host "`nEncoded keystore saved to: $encodedKeystorePath"
+    Write-Host "Use this value for the ENCODED_KEYSTORE secret in GitHub"
+} else {
+    Write-Error "Failed to generate keystore"
     exit 1
 }
-
-# Create gradle.properties with signing config
-$gradleProps = @"
-RELEASE_STORE_FILE=ledgerpro.keystore
-RELEASE_KEY_ALIAS=$KEY_ALIAS
-RELEASE_STORE_PASSWORD=$STORE_PASSWORD
-RELEASE_KEY_PASSWORD=$KEY_PASSWORD
-"@
-
-New-Item -ItemType Directory -Force -Path "android" | Out-Null
-Set-Content -Path "android/gradle.properties" -Value $gradleProps
-
-# Output GitHub Actions secrets
-Write-Host "`nAdd these secrets to your GitHub repository:"
-Write-Host "ANDROID_KEYSTORE_PASSWORD: $STORE_PASSWORD"
-Write-Host "ANDROID_KEY_ALIAS: $KEY_ALIAS"
-Write-Host "ANDROID_KEY_PASSWORD: $KEY_PASSWORD"
-
-# Create a base64 encoded version of the keystore for GitHub Actions
-$keystoreBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($KEYSTORE_PATH))
-Set-Content -Path "android/keystore_base64.txt" -Value $keystoreBase64
-Write-Host "`nAlso add this secret (contents of android/keystore_base64.txt):"
-Write-Host "ANDROID_KEYSTORE_BASE64"
-
-Write-Host "`nSetup complete! The keystore has been generated and gradle.properties has been updated."

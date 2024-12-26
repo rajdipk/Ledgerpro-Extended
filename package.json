@@ -1,12 +1,13 @@
 {
   "name": "ledgerpro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LedgerPro - Professional Accounting Software",
-  "main": "index.js",
+  "main": "src/main.js",
   "scripts": {
-    "start": "node backend/src/server.js",
-    "dev": "nodemon backend/src/server.js",
+    "start": "electron .",
     "build": "electron-builder build",
+    "build:windows": "electron-builder --windows",
+    "build:android": "ionic capacitor build android --release",
     "release": "node scripts/create-release.js"
   },
   "repository": {
@@ -26,12 +27,17 @@
   },
   "homepage": "https://github.com/rajdipk/Ledgerpro-Extended#readme",
   "dependencies": {
+    "electron-updater": "^6.1.7",
     "express": "^4.18.2",
     "mongoose": "^7.5.0",
     "razorpay": "^2.9.2",
     "dotenv": "^16.3.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^5.5.0",
+    "@capacitor/cli": "^5.5.0",
+    "@capacitor/core": "^5.5.0",
+    "@ionic/cli": "^7.1.1",
     "electron": "^25.8.0",
     "electron-builder": "^24.6.3",
     "nodemon": "^3.0.1"
@@ -42,9 +48,31 @@
     "directories": {
       "output": "dist"
     },
+    "files": [
+      "src/**/*",
+      "docs/**/*",
+      "package.json"
+    ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
       "icon": "assets/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LedgerPro"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "rajdipk",
+      "repo": "Ledgerpro-Extended"
     }
   }
 }

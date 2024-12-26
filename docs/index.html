@@ -572,6 +572,38 @@
         // API Configuration
         const API_BASE_URL = 'https://ledgerpro-backend.onrender.com';
 
+        // Generic API call function with error handling
+        async function apiCall(endpoint, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                mode: 'cors'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    ...defaultOptions,
+                    ...options,
+                    headers: {
+                        ...defaultOptions.headers,
+                        ...options.headers
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error(`API call failed: ${error.message}`);
+                throw error;
+            }
+        }
+
         // Form submission and payment handling
         async function handleSignup(event) {
             event.preventDefault();
@@ -587,108 +619,49 @@
                 submitBtn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Processing...';
 
                 // Check if backend is available
-                const healthCheck = await fetch(`${API_BASE_URL}/api/health`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    mode: 'cors'
-                });
+                await apiCall('/api/health');
 
-                if (!healthCheck.ok) {
-                    throw new Error('Server is not responding. Please try again later.');
-                }
-
-                const response = await fetch(`${API_BASE_URL}/api/customers/register`, {
+                // Register customer
+                const result = await apiCall('/api/customers/register', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    mode: 'cors',
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Registration failed');
-                }
+                if (result.success) {
+                    // Handle successful registration
+                    const options = {
+                        ...result.data.paymentConfig,
+                        handler: async function(response) {
+                            try {
+                                const verifyResult = await apiCall('/api/customers/verify-payment', {
+                                    method: 'POST',
+                                    body: JSON.stringify({
+                                        ...response,
+                                        customerId: result.data.customer._id
+                                    })
+                                });
 
-                const result = await response.json();
-
-                if (data.licenseType === 'demo') {
-                    // Handle demo version
-                    alert('Registration successful! Your download will begin shortly.');
-                    // Create a temporary link and click it to start download
-                    const link = document.createElement('a');
-                    link.href = result.data.downloadUrl;
-                    link.target = '_blank';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    return;
-                }
-
-                if (data.licenseType === 'enterprise') {
-                    // Handle enterprise version
-                    alert('Thank you for your interest! Our sales team will contact you shortly.');
-                    return;
-                }
-
-                // Handle professional version with Razorpay
-                const options = {
-                    ...result.data.paymentConfig,
-                    handler: async function(response) {
-                        try {
-                            const verifyResponse = await fetch(`${API_BASE_URL}/api/customers/verify-payment`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    razorpay_order_id: response.razorpay_order_id,
-                                    razorpay_payment_id: response.razorpay_payment_id,
-                                    razorpay_signature: response.razorpay_signature
-                                })
-                            });
-
-                            if (!verifyResponse.ok) {
-                                throw new Error('Payment verification failed');
+                                if (verifyResult.success) {
+                                    alert('Payment successful! Your license key has been sent to your email.');
+                                    form.reset();
+                                }
+                            } catch (error) {
+                                alert(error.message);
                             }
-
-                            const verifyResult = await verifyResponse.json();
-                            alert('Payment successful! Your download will begin shortly.');
-                            
-                            // Start download
-                            const link = document.createElement('a');
-                            link.href = verifyResult.data.downloadUrl;
-                            link.target = '_blank';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-
-                        } catch (error) {
-                            console.error('Payment verification error:', error);
-                            alert('Payment verification failed. Please contact support.');
+                        },
+                        modal: {
+                            ondismiss: function() {
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = originalBtnText;
+                            }
                         }
-                    },
-                    modal: {
-                        ondismiss: function() {
-                            alert('Payment cancelled. You can try again later.');
-                        }
-                    },
-                    theme: {
-                        color: '#009688' // Match our primary color
-                    }
-                };
+                    };
 
-                const rzp = new Razorpay(options);
-                rzp.open();
-
+                    const rzp = new Razorpay(options);
+                    rzp.open();
+                }
             } catch (error) {
-                console.error('Error:', error);
-                alert('There was an error processing your request. Please try again.');
-            } finally {
-                // Reset button state
+                alert(error.message);
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnText;
             }

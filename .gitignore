@@ -50,3 +50,7 @@ app.*.map.json
 
 # Android signing
 android/app/ledgerpro.keystore
+
+# Specific executables
+innosetup.exe
+backend/node_modules/nodemon/bin/windows-kill.exe

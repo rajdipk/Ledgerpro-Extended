@@ -18,7 +18,10 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project for business related applications">
+  <meta name="description" content="LedgerPro - A comprehensive business management solution for inventory, billing, and customer management">
+  <meta name="keywords" content="ledger,business management,inventory,billing,accounting,flutter">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0175C2">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -29,35 +32,79 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>ledgerpro</title>
+  <title>LedgerPro - Business Management Solution</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Loading indicator styles -->
+  <style>
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      -ms-transform: translate(-50%, -50%);
+      transform: translate(-50%, -50%);
+    }
+    .loading-text {
+      font-family: sans-serif;
+      color: #0175C2;
+      margin-top: 16px;
+      font-size: 18px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #0175C2;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 
   <script>
     // The value below is injected by flutter build, do not touch.
     const flutterServiceWorkerVersion = "{{flutter_service_worker_version}}";
   </script>
   <script src="flutter.js" defer></script>
-  </head>
-  
-  <body>
-    <script>
-      window.addEventListener('load', function (ev) {
-        // Load main.dart.js using FlutterLoader.load
-        FlutterLoader.load({
-          serviceWorker: {
-            serviceWorkerVersion: flutterServiceWorkerVersion,
-          },
-          onInitializationError: function (error) {
-            console.error('Failed to initialize Flutter', error);
-          },
-          onConfigurationChanged: function (configuration) {
-            console.log('Flutter configuration changed', configuration);
-          },
-          onAppLoaded: function () {
-            console.log('Flutter app is running');
-          }
-        });
+</head>
+
+<body>
+  <!-- Loading indicator -->
+  <div class="loading">
+    <div>
+      <div class="spinner"></div>
+      <p class="loading-text">Loading LedgerPro...</p>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function (ev) {
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: flutterServiceWorkerVersion,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine().then(function(appRunner) {
+            appRunner.runApp();
+          });
+        }
       });
-    </script>
+    });
+    
+    // Handle service worker registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('flutter-first-frame', function () {
+        navigator.serviceWorker.register('flutter_service_worker.js');
+      });
+    }
+  </script>
 </body>
 </html>

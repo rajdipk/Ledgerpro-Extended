@@ -153,7 +153,7 @@ class _SelectCustomerDialogState extends State<SelectCustomerDialog> {
                                     color: Theme.of(context).colorScheme.outline,
                                   ),
                             ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           FilledButton.icon(
                             onPressed: _addNewCustomer,
                             icon: const Icon(Icons.person_add),

@@ -9,6 +9,12 @@
 .history
 .svn/
 migrate_working_dir/
+node_modules/
+dist/
+build/
+*.exe
+*.apk
+.env
 
 # IntelliJ related
 *.iml

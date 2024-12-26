@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../database/database_helper.dart';
+import '../dialogs/add_business_dialog.dart';
 import '../models/business_model.dart';
 import '../providers/business_provider.dart';
 import '../providers/currency_provider.dart';
@@ -67,75 +68,13 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     }
   }
 
-  void _showAddBusinessDialog(BuildContext context) {
-    _businessNameController.clear();
+  Future<void> _showAddBusinessDialog(BuildContext context) async {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Add New Business'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _businessNameController,
-                focusNode: _businessNameFocusNode,
-                decoration: const InputDecoration(
-                  labelText: 'Business Name',
-                  hintText: 'Enter your business name',
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.teal),
-                  ),
-                  labelStyle: TextStyle(color: Colors.teal),
-                ),
-                onSubmitted: (_) => _addBusiness(dialogContext),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.teal,
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => _addBusiness(dialogContext),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Add'),
-            ),
-          ],
-        );
+        return const AddBusinessDialog();
       },
-    ).then((_) {
-      // Ensure focus is properly cleaned up
-      _businessNameFocusNode.unfocus();
-    });
-  }
-
-  Future<void> _addBusiness(BuildContext dialogContext) async {
-    final String businessName = _businessNameController.text.trim();
-    if (businessName.isNotEmpty) {
-      final businessProvider = Provider.of<BusinessProvider>(context, listen: false);
-      await businessProvider.addBusiness(businessName);
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext).pop();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Business "$businessName" added successfully!'),
-              backgroundColor: Colors.teal,
-            ),
-          );
-        }
-      }
-    }
+    );
   }
 
   Widget _buildNoBusinessSelectedMessage() {
@@ -290,7 +229,6 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     final formatter = NumberFormat("#,##0.00", "en_US");
     return formatter.format(value);
   }
-
 
   Widget _buildBalanceCard(String title, double amount, Color color, IconData icon, BuildContext context) {
     final currencySymbol = Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;

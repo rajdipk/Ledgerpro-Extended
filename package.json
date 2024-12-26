@@ -1,0 +1,50 @@
+{
+  "name": "ledgerpro",
+  "version": "1.0.0",
+  "description": "LedgerPro - Professional Accounting Software",
+  "main": "index.js",
+  "scripts": {
+    "start": "node backend/src/server.js",
+    "dev": "nodemon backend/src/server.js",
+    "build": "electron-builder build",
+    "release": "node scripts/create-release.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rajdipk/Ledgerpro-Extended.git"
+  },
+  "keywords": [
+    "accounting",
+    "ledger",
+    "business",
+    "finance"
+  ],
+  "author": "Rajdip Kumar",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rajdipk/Ledgerpro-Extended/issues"
+  },
+  "homepage": "https://github.com/rajdipk/Ledgerpro-Extended#readme",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^7.5.0",
+    "razorpay": "^2.9.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "electron": "^25.8.0",
+    "electron-builder": "^24.6.3",
+    "nodemon": "^3.0.1"
+  },
+  "build": {
+    "appId": "com.rajdipk.ledgerpro",
+    "productName": "LedgerPro",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/icon.ico"
+    }
+  }
+}

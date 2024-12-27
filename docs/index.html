@@ -681,35 +681,51 @@
 
         function initializeRazorpayPayment(paymentConfig) {
             const options = {
-                ...paymentConfig,
-                method: {
-                    upi: true,
-                    card: true,
-                    netbanking: true,
-                    wallet: true
-                },
+                key: paymentConfig.key,
+                amount: paymentConfig.amount,
+                currency: paymentConfig.currency,
+                name: paymentConfig.name,
+                description: paymentConfig.description,
+                order_id: paymentConfig.order_id,
+                prefill: paymentConfig.prefill,
                 config: {
                     display: {
                         blocks: {
                             upi: {
-                                name: 'Pay via UPI',
+                                name: "Pay via UPI",
                                 instruments: [
                                     {
-                                        method: 'upi',
-                                        apps: ['google_pay', 'phonepe', 'paytm', 'bhim']
+                                        method: "upi",
+                                        apps: ["google_pay", "phonepe", "paytm", "bhim"]
                                     }
                                 ]
                             },
-                            other: {
-                                name: 'Other Payment Methods',
+                            card: {
+                                name: "Pay via Card",
                                 instruments: [
-                                    { method: 'card' },
-                                    { method: 'netbanking' },
-                                    { method: 'wallet' }
+                                    {
+                                        method: "card"
+                                    }
+                                ]
+                            },
+                            netbanking: {
+                                name: "Pay via Netbanking",
+                                instruments: [
+                                    {
+                                        method: "netbanking"
+                                    }
+                                ]
+                            },
+                            wallet: {
+                                name: "Pay via Wallet",
+                                instruments: [
+                                    {
+                                        method: "wallet"
+                                    }
                                 ]
                             }
                         },
-                        sequence: ['block.upi', 'block.other'],
+                        sequence: ["block.upi", "block.card", "block.netbanking", "block.wallet"],
                         preferences: {
                             show_default_blocks: true
                         }
@@ -736,13 +752,12 @@
                             throw new Error(verifyResult.error || 'Payment verification failed');
                         }
 
-                        // Show success message and license key
-                        showMessage(`Payment successful! Your license key is: ${verifyResult.data.licenseKey}`, 'success');
+                        showMessage('Payment successful! Your license key will be sent to your email.', 'success');
                         
                         // Poll for payment status
                         pollPaymentStatus(paymentConfig.order_id);
                     } catch (error) {
-                        console.error('Payment verification failed:', error);
+                        console.error('Payment verification error:', error);
                         showMessage(error.message || 'Payment verification failed. Please try again.', 'error');
                     }
                 },
@@ -755,10 +770,6 @@
                 },
                 theme: {
                     color: '#2563eb'
-                },
-                retry: {
-                    enabled: true,
-                    max_count: 3
                 }
             };
 

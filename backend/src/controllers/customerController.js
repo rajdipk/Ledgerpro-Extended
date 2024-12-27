@@ -28,6 +28,15 @@ exports.register = async (req, res) => {
             phone
         } = req.body;
 
+        // Check if email already exists
+        const existingCustomer = await Customer.findOne({ email });
+        if (existingCustomer) {
+            return res.status(400).json({
+                success: false,
+                error: 'This email is already registered. Please use a different email address or contact support.'
+            });
+        }
+
         // Create customer in database
         customer = new Customer({
             businessName,

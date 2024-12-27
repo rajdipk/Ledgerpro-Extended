@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const customerRoutes = require('./routes/customerRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -26,8 +27,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint (before other routes)
+// Debug route to test basic functionality
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Server is running' });
+});
+
+// Health check endpoint
 app.get('/api/health', (req, res) => {
+  console.log('Health check endpoint called');
   res.status(200).json({ 
     status: 'ok',
     message: 'Server is running',
@@ -36,8 +43,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/api/customers', require('./routes/customerRoutes'));
+// Mount API routes
+console.log('Mounting customer routes at /api/customers');
+app.use('/api/customers', customerRoutes);
+
+// List all registered routes
+console.log('Registered routes:');
+app._router.stack.forEach(middleware => {
+  if (middleware.route) {
+    console.log(`${Object.keys(middleware.route.methods)} ${middleware.route.path}`);
+  } else if (middleware.name === 'router') {
+    middleware.handle.stack.forEach(handler => {
+      if (handler.route) {
+        console.log(`${Object.keys(handler.route.methods)} ${middleware.regexp} ${handler.route.path}`);
+      }
+    });
+  }
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

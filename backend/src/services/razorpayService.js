@@ -24,7 +24,9 @@ class RazorpayService {
             notes: {
                 customerId,
                 licenseType: 'professional'
-            }
+            },
+            payment_capture: 1,
+            partial_payment: false
         };
 
         try {
@@ -40,20 +42,15 @@ class RazorpayService {
     verifyPaymentSignature(orderId, paymentId, signature) {
         console.log('Verifying payment signature:', { orderId, paymentId });
         
-        try {
-            const text = `${orderId}|${paymentId}`;
-            const generated_signature = crypto
-                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-                .update(text)
-                .digest('hex');
+        const text = `${orderId}|${paymentId}`;
+        const generated_signature = crypto
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .update(text)
+            .digest('hex');
 
-            const isValid = generated_signature === signature;
-            console.log('Signature verification result:', isValid);
-            return isValid;
-        } catch (error) {
-            console.error('Error verifying payment signature:', error);
-            return false;
-        }
+        const isValid = generated_signature === signature;
+        console.log('Signature verification result:', isValid);
+        return isValid;
     }
 
     async verifyWebhookSignature(body, signature) {

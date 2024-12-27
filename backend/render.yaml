@@ -16,12 +16,6 @@ services:
         sync: false
       - key: JWT_EXPIRES_IN
         value: 30d
-      - key: RAZORPAY_KEY_ID
-        sync: false
-      - key: RAZORPAY_KEY_SECRET
-        sync: false
-      - key: RAZORPAY_WEBHOOK_SECRET
-        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -34,3 +28,9 @@ services:
         sync: false
       - key: DEMO_PERIOD_DAYS
         value: 30
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false

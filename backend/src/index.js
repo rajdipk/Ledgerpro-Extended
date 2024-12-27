@@ -64,11 +64,10 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   console.log('Health check endpoint called');
   res.status(200).json({ 
-    status: 'ok',
-    message: 'Server is running',
-    timestamp: new Date().toISOString(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    env: process.env.NODE_ENV
+    status: 'healthy',
+    time: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 

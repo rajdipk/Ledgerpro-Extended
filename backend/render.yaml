@@ -2,12 +2,12 @@ services:
   - type: web
     name: ledgerpro-extended
     env: node
+    region: singapore
+    plan: free
     buildCommand: npm install
     startCommand: node src/index.js
     autoDeploy: true
-    repo:
-      branch: main
-    healthCheckPath: /
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -17,7 +17,7 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: JWT_EXPIRES_IN
+      - key: JWT_EXPIRY
         value: 30d
       - key: RAZORPAY_KEY_ID
         sync: false

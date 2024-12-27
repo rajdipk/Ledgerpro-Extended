@@ -14,9 +14,14 @@ console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Set' : 'Not set');
 
 // CORS Configuration
 const corsOptions = {
-  origin: ['https://rajdipk.github.io', 'http://localhost:3000', 'http://localhost:5000'],
+  origin: [
+    'https://rajdipk.github.io',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://ledgerpro-extended.onrender.com'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
   optionsSuccessStatus: 200
 };

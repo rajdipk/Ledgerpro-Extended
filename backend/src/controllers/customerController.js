@@ -29,6 +29,7 @@ exports.register = async (req, res) => {
         const customer = new Customer({
             businessName,
             email,
+            phone,
             industry,
             platform,
             businessNeeds,

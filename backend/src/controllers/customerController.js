@@ -14,10 +14,7 @@ const getDownloadUrl = (platform, version = 'latest') => {
 };
 
 exports.register = async (req, res) => {
-    let customer;
     try {
-        console.log('Registration request received:', req.body);
-        
         const {
             businessName,
             email,
@@ -28,8 +25,12 @@ exports.register = async (req, res) => {
             phone
         } = req.body;
 
-        // Check if email already exists
-        const existingCustomer = await Customer.findOne({ email });
+        console.log('Registration request:', { email, businessName, phone });
+
+        // Check if email exists
+        const existingCustomer = await Customer.findOne({ email: email.toLowerCase() });
+        console.log('Existing customer check:', existingCustomer);
+
         if (existingCustomer) {
             return res.status(400).json({
                 success: false,
@@ -38,9 +39,9 @@ exports.register = async (req, res) => {
         }
 
         // Create customer in database
-        customer = new Customer({
+        const customer = new Customer({
             businessName,
-            email,
+            email: email.toLowerCase(),
             phone,
             industry,
             platform,
@@ -142,20 +143,9 @@ exports.register = async (req, res) => {
         }
     } catch (error) {
         console.error('Registration error:', error);
-        
-        // If customer was created but there was another error, clean up
-        if (customer && customer._id) {
-            try {
-                await Customer.findByIdAndDelete(customer._id);
-                console.log('Cleaned up customer record after error:', customer._id);
-            } catch (cleanupError) {
-                console.error('Failed to clean up customer record:', cleanupError);
-            }
-        }
-
-        return res.status(400).json({
+        res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Registration failed. Please try again.'
         });
     }
 };
@@ -168,6 +158,8 @@ exports.verifyPayment = async (req, res) => {
             razorpay_signature
         } = req.body;
 
+        console.log('Payment verification request:', { razorpay_order_id, razorpay_payment_id, razorpay_signature });
+
         // Verify payment signature
         const isValid = razorpayService.verifyPaymentSignature(
             razorpay_order_id,
@@ -175,13 +167,23 @@ exports.verifyPayment = async (req, res) => {
             razorpay_signature
         );
 
+        console.log('Signature verification result:', isValid);
+
         if (!isValid) {
-            throw new Error('Invalid payment signature');
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid payment signature'
+            });
         }
 
         // Find customer by order ID
-        const customer = await Customer.findOne({ razorpayCustomerId: razorpay_order_id });
-        if (!customer) throw new Error('Customer not found');
+        const customer = await Customer.findOne({ razorpayOrderId: razorpay_order_id });
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                error: 'Order not found'
+            });
+        }
 
         // Fetch payment details
         const payment = await razorpayService.fetchPaymentById(razorpay_payment_id);
@@ -213,12 +215,11 @@ exports.verifyPayment = async (req, res) => {
                 downloadUrl: getDownloadUrl(customer.platform)
             }
         });
-
     } catch (error) {
         console.error('Payment verification error:', error);
-        res.status(400).json({
+        res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Payment verification failed'
         });
     }
 };
@@ -227,8 +228,15 @@ exports.verifyLicense = async (req, res) => {
     try {
         const { licenseKey } = req.body;
 
+        console.log('License verification request:', { licenseKey });
+
         const customer = await Customer.findByLicenseKey(licenseKey);
-        if (!customer) throw new Error('Invalid license key');
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                error: 'License key not found'
+            });
+        }
 
         const isValid = customer.isLicenseValid();
         
@@ -241,11 +249,11 @@ exports.verifyLicense = async (req, res) => {
                 features: licenseManager.getLicenseFeatures(customer.license.type)
             }
         });
-
     } catch (error) {
-        res.status(400).json({
+        console.error('License verification error:', error);
+        res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'License verification failed'
         });
     }
 };
@@ -254,8 +262,15 @@ exports.trackDownload = async (req, res) => {
     try {
         const { licenseKey, platform, version } = req.body;
 
+        console.log('Download tracking request:', { licenseKey, platform, version });
+
         const customer = await Customer.findByLicenseKey(licenseKey);
-        if (!customer) throw new Error('Invalid license key');
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                error: 'License key not found'
+            });
+        }
 
         if (!customer.canDownload(platform)) {
             throw new Error('Download not allowed for this platform');
@@ -269,11 +284,11 @@ exports.trackDownload = async (req, res) => {
             success: true,
             message: 'Download tracked successfully'
         });
-
     } catch (error) {
-        res.status(400).json({
+        console.error('Download tracking error:', error);
+        res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Download tracking failed'
         });
     }
 };
@@ -315,9 +330,9 @@ exports.getPaymentStatus = async (req, res) => {
         });
     } catch (error) {
         console.error('Error checking payment status:', error);
-        res.status(400).json({
+        res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Payment status check failed'
         });
     }
 };
@@ -386,9 +401,9 @@ exports.handleWebhook = async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Webhook error:', error);
-        res.status(400).json({
+        res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Webhook processing failed'
         });
     }
 };

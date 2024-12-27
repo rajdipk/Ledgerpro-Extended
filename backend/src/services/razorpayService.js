@@ -10,7 +10,7 @@ class RazorpayService {
         });
 
         this.prices = {
-            professional: 10, // $10 USD
+            professional: 999, // ₹999 INR
             enterprise: 0 // Custom pricing
         };
     }
@@ -19,15 +19,14 @@ class RazorpayService {
         console.log('Creating Razorpay order for customer:', customerId);
         
         const options = {
-            amount: this.prices.professional * 100, // Convert to smallest currency unit (cents)
-            currency: 'INR', // Changed to INR for better UPI support
+            amount: this.prices.professional * 100, // Convert to smallest currency unit (paise)
+            currency: 'INR',
             receipt: `order_${customerId}`,
             notes: {
                 customerId,
                 licenseType: 'professional'
             },
-            payment_capture: 1,
-            partial_payment: false
+            payment_capture: 1
         };
 
         try {
@@ -41,17 +40,21 @@ class RazorpayService {
     }
 
     verifyPaymentSignature(orderId, paymentId, signature) {
-        console.log('Verifying payment signature:', { orderId, paymentId });
+        console.log('Verifying payment signature:', { orderId, paymentId, signature });
         
         try {
-            const text = `${orderId}|${paymentId}`;
-            const generated_signature = crypto
-                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-                .update(text)
-                .digest('hex');
+            const body = orderId + "|" + paymentId;
+            const expectedSignature = crypto
+                .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+                .update(body.toString())
+                .digest("hex");
 
-            const isValid = generated_signature === signature;
-            console.log('Signature verification result:', isValid);
+            const isValid = expectedSignature === signature;
+            console.log('Signature verification:', {
+                expected: expectedSignature,
+                received: signature,
+                isValid
+            });
             return isValid;
         } catch (error) {
             console.error('Error verifying payment signature:', error);

@@ -1,21 +1,30 @@
 services:
   - type: web
-    name: ledgerpro-backend
+    name: ledgerpro-extended
     env: node
-    rootDir: backend
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && node src/index.js
+    buildCommand: npm install
+    startCommand: node src/index.js
+    autoDeploy: true
+    repo:
+      branch: main
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
       - key: MONGODB_URI
-        sync: false # Will be set manually in Render dashboard
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRES_IN
         value: 30d
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -28,9 +37,3 @@ services:
         sync: false
       - key: DEMO_PERIOD_DAYS
         value: 30
-      - key: RAZORPAY_KEY_ID
-        sync: false
-      - key: RAZORPAY_KEY_SECRET
-        sync: false
-      - key: RAZORPAY_WEBHOOK_SECRET
-        sync: false

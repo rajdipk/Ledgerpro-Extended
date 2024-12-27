@@ -78,6 +78,10 @@ exports.register = async (req, res) => {
             const order = await razorpayService.createOrder(customer._id);
             console.log('Razorpay order created:', order.id);
 
+            // Save order ID to customer
+            customer.razorpayOrderId = order.id;
+            await customer.save();
+
             return res.status(201).json({
                 success: true,
                 data: {

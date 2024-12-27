@@ -32,6 +32,18 @@ const customerSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    razorpayOrderId: {
+        type: String,
+        sparse: true
+    },
+    razorpayPaymentId: {
+        type: String,
+        sparse: true
+    },
+    razorpaySignature: {
+        type: String,
+        sparse: true
+    },
     razorpayCustomerId: {
         type: String,
         sparse: true
@@ -49,29 +61,39 @@ const customerSchema = new mongoose.Schema({
         },
         status: {
             type: String,
-            enum: ['active', 'expired', 'suspended'],
-            default: 'active'
+            enum: ['pending', 'active', 'expired', 'payment_failed', 'cancelled'],
+            default: 'pending'
+        },
+        endDate: {
+            type: Date
+        },
+        activationDate: {
+            type: Date
+        },
+        lastVerified: {
+            type: Date
         },
         startDate: {
             type: Date,
             default: Date.now
-        },
-        endDate: {
-            type: Date,
-            required: true
         }
     },
     downloads: [{
-        platform: {
-            type: String,
-            required: true,
-            enum: ['windows', 'android']
+        platform: String,
+        version: String,
+        timestamp: {
+            type: Date,
+            default: Date.now
         },
-        version: {
-            type: String,
-            required: true
-        },
-        downloadDate: {
+        ip: String
+    }],
+    paymentHistory: [{
+        orderId: String,
+        paymentId: String,
+        amount: Number,
+        currency: String,
+        status: String,
+        timestamp: {
             type: Date,
             default: Date.now
         }
@@ -85,24 +107,33 @@ customerSchema.index({ email: 1, 'license.key': 1 });
 
 // Methods
 customerSchema.methods.isLicenseValid = function() {
-    if (!this.license) return false;
-    
-    const now = new Date();
-    return this.license.status === 'active' && 
-           this.license.endDate > now;
+    if (!this.license.key || this.license.status !== 'active') {
+        return false;
+    }
+
+    if (this.license.type === 'demo') {
+        return true;
+    }
+
+    return this.license.endDate && new Date() <= this.license.endDate;
 };
 
 customerSchema.methods.canDownload = function(platform) {
-    if (!this.isLicenseValid()) return false;
-    
-    // Check if platform matches customer's registered platform
-    return this.platform === platform;
+    return this.isLicenseValid() && this.platform === platform;
 };
 
 // Statics
-customerSchema.statics.findByLicenseKey = function(licenseKey) {
+customerSchema.statics.findByLicenseKey = async function(licenseKey) {
     return this.findOne({ 'license.key': licenseKey });
 };
+
+// Middleware
+customerSchema.pre('save', function(next) {
+    if (this.isModified('license.status') && this.license.status === 'active' && !this.license.activationDate) {
+        this.license.activationDate = new Date();
+    }
+    next();
+});
 
 const Customer = mongoose.model('Customer', customerSchema);
 

@@ -264,3 +264,118 @@ exports.trackDownload = async (req, res) => {
         });
     }
 };
+
+exports.getPaymentStatus = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        console.log('Checking payment status for order:', orderId);
+
+        // Get order details from Razorpay
+        const order = await razorpayService.getOrder(orderId);
+        console.log('Order details:', order);
+
+        // Get customer by order ID
+        const customer = await Customer.findOne({ 'razorpayOrderId': orderId });
+        if (!customer) {
+            throw new Error('Customer not found');
+        }
+
+        let status;
+        if (order.status === 'paid') {
+            status = 'completed';
+        } else if (order.status === 'attempted') {
+            status = 'pending';
+        } else {
+            status = 'failed';
+        }
+
+        res.json({
+            success: true,
+            data: {
+                status,
+                customer: {
+                    id: customer._id,
+                    businessName: customer.businessName,
+                    email: customer.email
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error checking payment status:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+exports.handleWebhook = async (req, res) => {
+    try {
+        const signature = req.headers['x-razorpay-signature'];
+        console.log('Received webhook:', { 
+            event: req.body.event,
+            signature
+        });
+
+        // Verify webhook signature
+        const isValidSignature = await razorpayService.verifyWebhookSignature(req.body, signature);
+        if (!isValidSignature) {
+            throw new Error('Invalid webhook signature');
+        }
+
+        const { payload } = req.body;
+        const { payment } = payload;
+
+        // Get payment details
+        const paymentDetails = await razorpayService.getPayment(payment.entity.id);
+        console.log('Payment details:', paymentDetails);
+
+        // Find customer by order ID
+        const customer = await Customer.findOne({ 'razorpayOrderId': payment.entity.order_id });
+        if (!customer) {
+            throw new Error('Customer not found');
+        }
+
+        switch (req.body.event) {
+            case 'payment.captured':
+                // Payment successful
+                customer.license.key = licenseManager.generateLicenseKey(customer._id, 'professional');
+                customer.license.status = 'active';
+                customer.razorpayPaymentId = payment.entity.id;
+                await customer.save();
+
+                try {
+                    await emailService.sendLicenseKeyEmail(customer);
+                    console.log('License key email sent successfully');
+                } catch (emailError) {
+                    console.error('Failed to send license key email:', emailError);
+                }
+                break;
+
+            case 'payment.failed':
+                // Payment failed
+                customer.license.status = 'payment_failed';
+                customer.razorpayPaymentId = payment.entity.id;
+                await customer.save();
+
+                try {
+                    await emailService.sendPaymentFailedEmail(customer);
+                    console.log('Payment failed email sent successfully');
+                } catch (emailError) {
+                    console.error('Failed to send payment failed email:', emailError);
+                }
+                break;
+
+            default:
+                console.log('Unhandled webhook event:', req.body.event);
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Webhook error:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message
+        });
+    }
+};

@@ -9,72 +9,87 @@ class RazorpayService {
         });
 
         this.prices = {
-            professional: 1000, // $10 in cents
+            professional: 4999, // $49.99 in USD
             enterprise: 0 // Custom pricing
         };
     }
 
-    async createOrder(licenseType, customerId) {
-        const amount = this.prices[licenseType];
-        if (!amount && licenseType !== 'enterprise') {
-            throw new Error('Invalid license type');
-        }
-
+    async createOrder(customerId) {
+        console.log('Creating Razorpay order for customer:', customerId);
+        
         const options = {
-            amount,
+            amount: this.prices.professional * 100, // Convert to smallest currency unit (cents)
             currency: 'USD',
             receipt: `order_${customerId}`,
             notes: {
                 customerId,
-                licenseType
+                licenseType: 'professional'
             }
         };
 
-        return await this.instance.orders.create(options);
+        try {
+            const order = await this.instance.orders.create(options);
+            console.log('Razorpay order created:', order.id);
+            return order;
+        } catch (error) {
+            console.error('Error creating Razorpay order:', error);
+            throw new Error('Failed to create payment order');
+        }
     }
 
     verifyPaymentSignature(orderId, paymentId, signature) {
-        const text = `${orderId}|${paymentId}`;
-        const generated_signature = crypto
-            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-            .update(text)
-            .digest('hex');
+        console.log('Verifying payment signature:', { orderId, paymentId });
+        
+        try {
+            const text = `${orderId}|${paymentId}`;
+            const generated_signature = crypto
+                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+                .update(text)
+                .digest('hex');
 
-        return generated_signature === signature;
+            const isValid = generated_signature === signature;
+            console.log('Signature verification result:', isValid);
+            return isValid;
+        } catch (error) {
+            console.error('Error verifying payment signature:', error);
+            return false;
+        }
     }
 
     async verifyWebhookSignature(body, signature) {
-        const webhook_secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-        const shasum = crypto.createHmac('sha256', webhook_secret);
-        shasum.update(JSON.stringify(body));
-        const digest = shasum.digest('hex');
+        console.log('Verifying webhook signature');
+        
+        try {
+            const webhook_secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+            const shasum = crypto.createHmac('sha256', webhook_secret);
+            shasum.update(JSON.stringify(body));
+            const digest = shasum.digest('hex');
 
-        return digest === signature;
+            const isValid = digest === signature;
+            console.log('Webhook signature verification result:', isValid);
+            return isValid;
+        } catch (error) {
+            console.error('Error verifying webhook signature:', error);
+            return false;
+        }
     }
 
-    async fetchPaymentById(paymentId) {
-        return await this.instance.payments.fetch(paymentId);
+    async getOrder(orderId) {
+        try {
+            return await this.instance.orders.fetch(orderId);
+        } catch (error) {
+            console.error('Error fetching Razorpay order:', error);
+            throw new Error('Failed to fetch payment order');
+        }
     }
 
-    generatePaymentConfig(orderId, amount, customerEmail, customerPhone) {
-        return {
-            key: process.env.RAZORPAY_KEY_ID,
-            amount,
-            currency: 'INR',
-            name: 'LedgerPro',
-            description: 'LedgerPro License Purchase',
-            order_id: orderId,
-            prefill: {
-                email: customerEmail,
-                contact: customerPhone
-            },
-            notes: {
-                address: 'LedgerPro Corporate Office'
-            },
-            theme: {
-                color: '#009688'
-            }
-        };
+    async getPayment(paymentId) {
+        try {
+            return await this.instance.payments.fetch(paymentId);
+        } catch (error) {
+            console.error('Error fetching Razorpay payment:', error);
+            throw new Error('Failed to fetch payment details');
+        }
     }
 }
 

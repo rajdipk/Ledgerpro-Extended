@@ -659,6 +659,39 @@
         function initializeRazorpayPayment(paymentConfig) {
             const options = {
                 ...paymentConfig,
+                method: {
+                    upi: true,
+                    card: true,
+                    netbanking: true,
+                    wallet: true
+                },
+                config: {
+                    display: {
+                        blocks: {
+                            upi: {
+                                name: 'Pay via UPI',
+                                instruments: [
+                                    {
+                                        method: 'upi',
+                                        apps: ['google_pay', 'phonepe', 'paytm', 'bhim']
+                                    }
+                                ]
+                            },
+                            other: {
+                                name: 'Other Payment Methods',
+                                instruments: [
+                                    { method: 'card' },
+                                    { method: 'netbanking' },
+                                    { method: 'wallet' }
+                                ]
+                            }
+                        },
+                        sequence: ['block.upi', 'block.other'],
+                        preferences: {
+                            show_default_blocks: true
+                        }
+                    }
+                },
                 handler: async function (response) {
                     try {
                         // Verify payment with backend
@@ -692,7 +725,16 @@
                 modal: {
                     ondismiss: function() {
                         showMessage('Payment cancelled. Please try again.', 'warning');
-                    }
+                    },
+                    confirm_close: true,
+                    escape: false
+                },
+                theme: {
+                    color: '#2563eb'
+                },
+                retry: {
+                    enabled: true,
+                    max_count: 3
                 }
             };
 

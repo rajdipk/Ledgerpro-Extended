@@ -577,29 +577,34 @@
             const defaultOptions = {
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                credentials: 'include',
                 mode: 'cors'
             };
 
-            try {
-                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                    ...defaultOptions,
-                    ...options,
-                    headers: {
-                        ...defaultOptions.headers,
-                        ...options.headers
-                    }
-                });
+            const finalOptions = {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            };
 
+            try {
+                console.log(`Calling ${endpoint} with options:`, finalOptions);
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, finalOptions);
+                
                 if (!response.ok) {
-                    const errorData = await response.json();
+                    const errorData = await response.json().catch(() => ({
+                        message: `HTTP error! status: ${response.status}`
+                    }));
                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
 
                 return await response.json();
             } catch (error) {
-                console.error(`API call failed: ${error.message}`);
+                console.error(`API call failed:`, error);
                 throw error;
             }
         }
@@ -619,7 +624,8 @@
                 submitBtn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Processing...';
 
                 // Check if backend is available
-                await apiCall('/api/health');
+                const healthCheck = await apiCall('/api/health');
+                console.log('Health check response:', healthCheck);
 
                 // Register customer
                 const result = await apiCall('/api/customers/register', {

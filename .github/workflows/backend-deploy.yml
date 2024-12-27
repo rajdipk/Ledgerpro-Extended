@@ -13,15 +13,29 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       
+      - name: Check Deploy Hook URL
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL is not set in GitHub Secrets"
+            echo "Please follow these steps to set it up:"
+            echo "1. Go to Render Dashboard"
+            echo "2. Select your service"
+            echo "3. Go to Settings"
+            echo "4. Find or Create Deploy Hook"
+            echo "5. Copy the URL"
+            echo "6. Go to GitHub repository Settings"
+            echo "7. Go to Secrets and variables > Actions"
+            echo "8. Add new secret named RENDER_DEPLOY_HOOK_URL"
+            echo "9. Paste the Deploy Hook URL as the value"
+            exit 1
+          fi
+          echo "Deploy Hook URL is configured"
+      
       - name: Deploy to Render
+        if: success()
         env:
           deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "$deploy_url" ]; then
-            echo "Error: RENDER_DEPLOY_HOOK_URL is not set"
-            exit 1
-          fi
-          
           echo "Triggering Render deployment..."
           RESPONSE=$(curl -s -w "\n%{http_code}" "$deploy_url")
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)

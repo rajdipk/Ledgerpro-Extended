@@ -9,7 +9,7 @@ class RazorpayService {
         });
 
         this.prices = {
-            professional: 4999, // $49.99 in USD
+            professional: 10, // $10 USD
             enterprise: 0 // Custom pricing
         };
     }

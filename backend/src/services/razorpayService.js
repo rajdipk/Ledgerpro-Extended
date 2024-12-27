@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 class RazorpayService {
     constructor() {
+        console.log('Initializing Razorpay with key:', process.env.RAZORPAY_KEY_ID);
         this.instance = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID,
             key_secret: process.env.RAZORPAY_KEY_SECRET
@@ -19,7 +20,7 @@ class RazorpayService {
         
         const options = {
             amount: this.prices.professional * 100, // Convert to smallest currency unit (cents)
-            currency: 'USD',
+            currency: 'INR', // Changed to INR for better UPI support
             receipt: `order_${customerId}`,
             notes: {
                 customerId,
@@ -31,40 +32,42 @@ class RazorpayService {
 
         try {
             const order = await this.instance.orders.create(options);
-            console.log('Razorpay order created:', order.id);
+            console.log('Razorpay order created:', order);
             return order;
         } catch (error) {
             console.error('Error creating Razorpay order:', error);
-            throw new Error('Failed to create payment order');
+            throw new Error('Failed to create payment order: ' + error.message);
         }
     }
 
     verifyPaymentSignature(orderId, paymentId, signature) {
         console.log('Verifying payment signature:', { orderId, paymentId });
         
-        const text = `${orderId}|${paymentId}`;
-        const generated_signature = crypto
-            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-            .update(text)
-            .digest('hex');
+        try {
+            const text = `${orderId}|${paymentId}`;
+            const generated_signature = crypto
+                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+                .update(text)
+                .digest('hex');
 
-        const isValid = generated_signature === signature;
-        console.log('Signature verification result:', isValid);
-        return isValid;
+            const isValid = generated_signature === signature;
+            console.log('Signature verification result:', isValid);
+            return isValid;
+        } catch (error) {
+            console.error('Error verifying payment signature:', error);
+            return false;
+        }
     }
 
-    async verifyWebhookSignature(body, signature) {
-        console.log('Verifying webhook signature');
-        
+    verifyWebhookSignature(body, signature) {
         try {
             const webhook_secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-            const shasum = crypto.createHmac('sha256', webhook_secret);
-            shasum.update(JSON.stringify(body));
-            const digest = shasum.digest('hex');
+            const generated_signature = crypto
+                .createHmac('sha256', webhook_secret)
+                .update(JSON.stringify(body))
+                .digest('hex');
 
-            const isValid = digest === signature;
-            console.log('Webhook signature verification result:', isValid);
-            return isValid;
+            return generated_signature === signature;
         } catch (error) {
             console.error('Error verifying webhook signature:', error);
             return false;

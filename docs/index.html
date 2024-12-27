@@ -692,42 +692,62 @@
                     email: true,
                     contact: true
                 },
-                config: {
-                    display: {
-                        hide: [],
-                        blocks: {
-                            banks: {
-                                name: 'Pay via UPI or Bank Transfer',
-                                instruments: [
-                                    {
-                                        method: 'upi'
-                                    },
-                                    {
-                                        method: 'netbanking'
-                                    }
-                                ]
-                            },
-                            cards: {
-                                name: 'Pay via Card',
-                                instruments: [
-                                    {
-                                        method: 'card'
-                                    }
-                                ]
-                            },
-                            wallets: {
-                                name: 'Other Payment Methods',
-                                instruments: [
-                                    {
-                                        method: 'wallet'
-                                    }
-                                ]
-                            }
+                notes: {
+                    address: "LedgerPro Corporate Office"
+                },
+                theme: {
+                    color: "#2563eb",
+                    backdrop_color: "rgba(0, 0, 0, 0.7)"
+                },
+                modal: {
+                    confirm_close: true,
+                    escape: false,
+                    animation: true,
+                    handleback: true,
+                    backdropclose: false,
+                    ondismiss: function() {
+                        showMessage('Payment cancelled. Please try again.', 'warning');
+                    }
+                },
+                send_sms_hash: true,
+                allow_rotation: true,
+                remember_customer: true,
+                display: {
+                    language: "en",
+                    blocks: {
+                        banks: {
+                            name: "Pay via UPI or Netbanking",
+                            instruments: [
+                                {
+                                    method: "upi",
+                                    flows: ["collect", "qr"],
+                                    apps: ["google_pay", "phonepe", "paytm", "bhim"]
+                                },
+                                {
+                                    method: "netbanking"
+                                }
+                            ]
                         },
-                        sequence: ['block.banks', 'block.cards', 'block.wallets'],
-                        preferences: {
-                            show_default_blocks: true
+                        cards: {
+                            name: "Pay via Card",
+                            instruments: [
+                                {
+                                    method: "card"
+                                }
+                            ]
+                        },
+                        other: {
+                            name: "Other Methods",
+                            instruments: [
+                                {
+                                    method: "wallet"
+                                }
+                            ]
                         }
+                    },
+                    sequence: ["block.banks", "block.cards", "block.other"],
+                    preferences: {
+                        show_default_blocks: true
                     }
                 },
                 handler: async function (response) {
@@ -757,22 +777,14 @@
                         console.error('Payment verification error:', error);
                         showMessage(error.message || 'Payment verification failed. Please try again.', 'error');
                     }
-                },
-                modal: {
-                    ondismiss: function() {
-                        showMessage('Payment cancelled. Please try again.', 'warning');
-                    },
-                    confirm_close: true,
-                    escape: false,
-                    animation: true
-                },
-                theme: {
-                    color: '#2563eb',
-                    backdrop_color: 'rgba(0, 0, 0, 0.7)'
                 }
             };
 
             const rzp = new Razorpay(options);
+            rzp.on('payment.failed', function (response) {
+                console.error('Payment failed:', response.error);
+                showMessage(`Payment failed: ${response.error.description}`, 'error');
+            });
             rzp.open();
         }
 

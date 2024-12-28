@@ -8,6 +8,8 @@ import 'dart:async';
 import '../dialogs/add_business_dialog.dart';
 import 'package:intl/intl.dart';
 import '../providers/business_provider.dart';
+import '../providers/license_provider.dart';
+import '../screens/account/account_details_screen.dart';
 
 class NavigationPanel extends StatefulWidget {
   final VoidCallback onSettings;
@@ -64,6 +66,7 @@ class _NavigationPanelState extends State<NavigationPanel> {
   @override
   Widget build(BuildContext context) {
     final businessProvider = Provider.of<BusinessProvider>(context);
+    final licenseProvider = Provider.of<LicenseProvider>(context);
     var selectedBusiness = businessProvider.selectedBusinessId;
     List<DropdownMenuItem<String>> dropdownItems = businessProvider.businesses
         .map((business) => DropdownMenuItem<String>(
@@ -102,8 +105,8 @@ class _NavigationPanelState extends State<NavigationPanel> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.teal.shade700,
-                    Colors.teal.shade500,
+                    Colors.teal[700]!,
+                    Colors.teal[500]!,
                   ],
                 ),
                 borderRadius: const BorderRadius.only(
@@ -113,6 +116,47 @@ class _NavigationPanelState extends State<NavigationPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'LedgerPro',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.account_circle,
+                            color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AccountDetailsScreen(),
+                            ),
+                          );
+                        },
+                        tooltip: 'Account Details',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    licenseProvider.currentLicense?.licenseType
+                            .toString()
+                            .split('.')
+                            .last
+                            .toUpperCase() ??
+                        'DEMO',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Container(

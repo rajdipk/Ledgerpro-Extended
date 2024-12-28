@@ -16,6 +16,7 @@ import '../../widgets/barcode_scanner_dialog.dart';
 import '../../services/sound_service.dart';
 import 'stock_movements_screen.dart'; // Import the new screen
 import '../../providers/business_provider.dart'; // Import BusinessProvider
+import '../../mixins/license_checker_mixin.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -24,7 +25,7 @@ class InventoryScreen extends StatefulWidget {
   _InventoryScreenState createState() => _InventoryScreenState();
 }
 
-class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProviderStateMixin {
+class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProviderStateMixin, LicenseCheckerMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   final _soundService = SoundService();
@@ -426,7 +427,6 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     );
   }
 
-
   Widget _buildPurchaseOrdersTab() {
     return Consumer<InventoryProvider>(
       builder: (context, provider, child) {
@@ -510,39 +510,84 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     );
   }
 
-  void _showItemDetails(BuildContext context, InventoryItem item) {
-    showDialog(
+  Future<void> _showItemDetails(BuildContext context, InventoryItem item) async {
+    await showDialog(
       context: context,
       builder: (context) => ItemDetailsDialog(item: item),
     );
   }
 
-  void _showOrderDetails(PurchaseOrder order) {
-    showDialog(
+  Future<void> _showOrderDetails(PurchaseOrder order) async {
+    await showDialog(
       context: context,
       builder: (context) => PurchaseOrderDetailsDialog(order: order),
     );
   }
 
-  void _showAddItemDialog() {
+  Future<void> _showAddItemDialog() async {
+    final currentCount = Provider.of<InventoryProvider>(context, listen: false).items.length;
+    if (!await checkWithinLimit(context, 'max_inventory_items', currentCount)) {
+      return;
+    }
+
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => const AddItemDialog(),
     );
   }
 
-  void _showAddMovementDialog([BuildContext? context, InventoryItem? item]) {
+  Future<void> _showAddPurchaseOrderDialog() async {
+    if (!await checkFeatureAvailability(context, 'purchase_orders')) {
+      return;
+    }
+
+    if (!mounted) return;
     showDialog(
+      context: context,
+      builder: (context) => const AddPurchaseOrderDialog(),
+    );
+  }
+
+  Future<void> _showAddMovementDialog([BuildContext? context, InventoryItem? item]) async {
+    if (!await checkFeatureAvailability(this.context, 'inventory_movements')) {
+      return;
+    }
+
+    if (!mounted) return;
+    await showDialog(
       context: this.context,
       builder: (context) => AddMovementDialog(selectedItem: item),
     );
   }
 
-  void _showAddPurchaseOrderDialog() {
-    showDialog(
+  Future<void> _scanBarcode() async {
+    if (!await checkFeatureAvailability(context, 'barcode_scanning')) {
+      return;
+    }
+
+    if (!mounted) return;
+    final String? scannedBarcode = await showDialog<String>(
       context: context,
-      builder: (context) => const AddPurchaseOrderDialog(),
+      barrierDismissible: false,
+      builder: (context) => const BarcodeScannerDialog(),
     );
+
+    if (scannedBarcode != null && mounted) {
+      await _soundService.playBeep();
+      setState(() {
+        _searchController.text = scannedBarcode;
+        _searchQuery = scannedBarcode.toLowerCase();
+      });
+    }
+  }
+
+  Future<void> _exportInventoryReport() async {
+    if (!await checkFeatureAvailability(context, 'inventory_reports')) {
+      return;
+    }
+
+    // Implement inventory report export...
   }
 
   Widget _buildSearchBar() {
@@ -592,24 +637,6 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         ],
       ),
     );
-  }
-
-  Future<void> _scanBarcode() async {
-    if (!mounted) return;
-    
-    final String? scannedBarcode = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const BarcodeScannerDialog(),
-    );
-
-    if (scannedBarcode != null && mounted) {
-      await _soundService.playBeep();
-      setState(() {
-        _searchController.text = scannedBarcode;
-        _searchQuery = scannedBarcode.toLowerCase();
-      });
-    }
   }
 
   bool _itemMatchesSearch(InventoryItem item) {

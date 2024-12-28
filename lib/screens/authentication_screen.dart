@@ -5,10 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import '../database/database_helper.dart';
 import '../mannuals/eula_screen.dart';
 import '../mannuals/terms_and_conditions_screen.dart';
+import '../screens/license/license_activation_screen.dart';
+import '../providers/license_provider.dart';
+import 'home_screen.dart';
 
 class AuthenticationScreen extends StatefulWidget {
   @override
@@ -21,11 +25,11 @@ class _AuthenticationScreenState extends State<AuthenticationScreen>
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final FocusNode _passwordFocusNode = FocusNode();
+  final _formKey = GlobalKey<FormState>();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _rememberMe = false;
   bool _acceptedTerms = true;
-  int _failedAttempts = 0;
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool _canCheckBiometrics = false;
   late AnimationController _animationController;
@@ -50,13 +54,6 @@ class _AuthenticationScreenState extends State<AuthenticationScreen>
     _passwordFocusNode.dispose();
     _animationController.dispose();
     super.dispose();
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a password';
-    }
-    return null;
   }
 
   @override
@@ -232,51 +229,57 @@ class _AuthenticationScreenState extends State<AuthenticationScreen>
   }
 
   Widget _buildLoginForm() {
-    return Column(
-      children: [
-        const SizedBox(height: 10),
-        _buildPasswordField(
-          controller: _passwordController,
-          label: 'Password',
-          isConfirmField: false,
-        ),
-        const SizedBox(height: 10),
-        _buildRememberMeRow(),
-        const SizedBox(height: 10),
-        _buildTermsAndConditionsRow(),
-        const SizedBox(height: 20),
-        _buildAuthButton(),
-      ],
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          _buildPasswordField(
+            controller: _passwordController,
+            label: 'Password',
+            isConfirmField: false,
+          ),
+          const SizedBox(height: 10),
+          _buildRememberMeRow(),
+          const SizedBox(height: 10),
+          _buildTermsAndConditionsRow(),
+          const SizedBox(height: 20),
+          _buildAuthButton(),
+        ],
+      ),
     );
   }
 
   Widget _buildSetPasswordForm() {
-    return Column(
-      children: [
-        const Text(
-          'Set Password',
-          style: TextStyle(
-            fontSize: 20.0,
-            fontWeight: FontWeight.bold,
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          const Text(
+            'Set Password',
+            style: TextStyle(
+              fontSize: 20.0,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        _buildPasswordField(
-          controller: _passwordController,
-          label: 'Enter Password',
-          isConfirmField: false,
-        ),
-        const SizedBox(height: 10),
-        _buildPasswordField(
-          controller: _confirmPasswordController,
-          label: 'Confirm Password',
-          isConfirmField: true,
-        ),
-        const SizedBox(height: 10),
-        _buildTermsAndConditionsRow(),
-        const SizedBox(height: 20),
-        _buildAuthButton(),
-      ],
+          const SizedBox(height: 20),
+          _buildPasswordField(
+            controller: _passwordController,
+            label: 'Enter Password',
+            isConfirmField: false,
+          ),
+          const SizedBox(height: 10),
+          _buildPasswordField(
+            controller: _confirmPasswordController,
+            label: 'Confirm Password',
+            isConfirmField: true,
+          ),
+          const SizedBox(height: 10),
+          _buildTermsAndConditionsRow(),
+          const SizedBox(height: 20),
+          _buildAuthButton(),
+        ],
+      ),
     );
   }
 
@@ -288,7 +291,15 @@ class _AuthenticationScreenState extends State<AuthenticationScreen>
     return TextFormField(
       controller: controller,
       obscureText: !_isPasswordVisible,
-      validator: _validatePassword,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter a password';
+        }
+        if (isConfirmField && value != _passwordController.text) {
+          return 'Passwords do not match';
+        }
+        return null;
+      },
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
@@ -478,6 +489,140 @@ class _AuthenticationScreenState extends State<AuthenticationScreen>
     }
   }
 
+  Future<void> _authenticate() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final db = DatabaseHelper.instance;
+      final isFirstTime = !(await db.isPasswordSet());
+
+      if (isFirstTime) {
+        await db.setPassword(_passwordController.text);
+        
+        // For first-time users, show license activation
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LicenseActivationScreen(),
+            ),
+          );
+        }
+      } else {
+        final isValid = await db.checkPassword(_passwordController.text);
+        if (!isValid) {
+          _showError('Incorrect password');
+          return;
+        }
+
+        // Check license status before proceeding
+        final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
+        await licenseProvider.initializeLicense();
+        final licenseStatus = await licenseProvider.getLicenseStatus();
+
+        if (mounted) {
+          if (licenseStatus['status'] == 'inactive') {
+            // No active license, show activation screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const LicenseActivationScreen(),
+              ),
+            );
+          } else {
+            // Has active license, proceed to home
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      _showError('Error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showResetPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: const Text(
+          'Please contact your system administrator to reset your password.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black87,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBiometricButton() {
+    return TextButton.icon(
+      onPressed: _isLoading
+          ? null
+          : () async {
+              setState(() => _isLoading = true);
+              try {
+                if (await _authenticateWithBiometrics()) {
+                  if (mounted) {
+                    Navigator.pushReplacementNamed(context, '/home');
+                  }
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                }
+              }
+            },
+      icon: _isLoading
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+              ),
+            )
+          : const Icon(Icons.fingerprint, size: 28),
+      label: Text(_isLoading ? 'Authenticating...' : 'Use Biometric Login'),
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.black87,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+          side: const BorderSide(color: Colors.black87),
+        ),
+      ),
+    );
+  }
+
   Future<bool> _authenticateWithBiometrics() async {
     bool authenticated = false;
     try {
@@ -523,182 +668,5 @@ class _AuthenticationScreenState extends State<AuthenticationScreen>
       return false;
     }
     return authenticated;
-  }
-
-  Widget _buildBiometricButton() {
-    return TextButton.icon(
-      onPressed: _isLoading
-          ? null
-          : () async {
-              setState(() => _isLoading = true);
-              try {
-                if (await _authenticateWithBiometrics()) {
-                  if (mounted) {
-                    Navigator.pushReplacementNamed(context, '/home');
-                  }
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isLoading = false);
-                }
-              }
-            },
-      icon: _isLoading
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-              ),
-            )
-          : const Icon(Icons.fingerprint, size: 28),
-      label: Text(_isLoading ? 'Authenticating...' : 'Use Biometric Login'),
-      style: TextButton.styleFrom(
-        foregroundColor: Colors.black87,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-          side: const BorderSide(color: Colors.black87),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _authenticate() async {
-    if (!_acceptedTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Please accept the Terms & Conditions and EULA to continue'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (_isLoading) return;
-
-    setState(() => _isLoading = true);
-    String password = _passwordController.text.trim();
-
-    try {
-      if (await DatabaseHelper.instance.isPasswordSet()) {
-        if (_failedAttempts >= 3) {
-          _showErrorDialog('Too many failed attempts. Please try again later.');
-          return;
-        }
-
-        bool isValid = await DatabaseHelper.instance.checkPassword(password);
-        if (isValid) {
-          _failedAttempts = 0;
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          _failedAttempts++;
-          _showErrorDialog(
-              'Invalid password. ${3 - _failedAttempts} attempts remaining.');
-        }
-      } else {
-        String? confirmPassword = _confirmPasswordController.text.trim();
-        if (confirmPassword.isEmpty) {
-          _showErrorDialog('Please confirm your password.');
-          return;
-        }
-        if (password != confirmPassword) {
-          _showErrorDialog('Passwords do not match.');
-          return;
-        }
-
-        String? validationError = _validatePassword(password);
-        if (validationError != null) {
-          _showErrorDialog(validationError);
-          return;
-        }
-
-        await _showSetPasswordDialog(password);
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _showSetPasswordDialog(String password) async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirm Password Setup'),
-          content: const SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text('You are setting a new password.'),
-                Text('Please remember this password for future logins.'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await DatabaseHelper.instance.setPassword(password);
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Confirm'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showResetPasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Password'),
-        content: const Text(
-          'Please contact your system administrator to reset your password.',
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 }

@@ -1,4 +1,3 @@
-//customer_operations_screen.dart
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import '../database/database_helper.dart';
 import '../models/customer_model.dart';
 import 'transaction_details_screen.dart';
 import '../widgets/animated_add_button.dart';
+import '../mixins/license_checker_mixin.dart';
 
 class CustomerOperationsScreen extends StatefulWidget {
   const CustomerOperationsScreen({super.key});
@@ -19,10 +19,9 @@ class CustomerOperationsScreen extends StatefulWidget {
   State<CustomerOperationsScreen> createState() => _CustomerOperationsScreenState();
 }
 
-class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> {
+class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> with LicenseCheckerMixin {
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Container(
@@ -90,7 +89,19 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> {
                         right: 16,
                         bottom: 16,
                         child: AnimatedAddButton(
-                          onPressed: () => showAddCustomerDialog(context),
+                          onPressed: () async {
+                            final currentCount = await DatabaseHelper.instance.getCustomerCount(
+                              int.parse(Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId!)
+                            );
+                            if (!await checkWithinLimit(context, 'max_customers', currentCount)) {
+                              return;
+                            }
+                            if (!mounted) return;
+                            await showDialog(
+                              context: context,
+                              builder: (context) => const AddCustomerDialog(),
+                            );
+                          },
                           label: 'Add Customer',
                           icon: Icons.person_add,
                         ),
@@ -169,10 +180,10 @@ class _CustomerList extends StatefulWidget {
   const _CustomerList(this.businessId);
 
   @override
-  __CustomerListState createState() => __CustomerListState();
+  State<_CustomerList> createState() => __CustomerListState();
 }
 
-class __CustomerListState extends State<_CustomerList> {
+class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin {
   List<Customer> _customers = [];
   List<Customer> _filteredCustomers = [];
   late BusinessProvider _businessProvider;
@@ -380,7 +391,7 @@ class __CustomerListState extends State<_CustomerList> {
                                   Icons.chevron_right,
                                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                                 ),
-                                onTap: () {
+                                onTap: () async {
                                   Provider.of<BusinessProvider>(context, listen: false)
                                       .setSelectedCustomer(customer);
                                   
@@ -391,13 +402,16 @@ class __CustomerListState extends State<_CustomerList> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => TransactionDetailsScreen(
-                                          businessId: int.parse(Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId!),
+                                          businessId: int.parse(widget.businessId),
                                           customerId: customer.id,
                                           isSupplier: false,
                                         ),
                                       ),
                                     );
                                   }
+                                  // Refresh transactions for the selected customer
+                                  await Provider.of<BusinessProvider>(context, listen: false)
+                                      .refreshTransactions(customer.id);
                                 },
                               ),
                             );

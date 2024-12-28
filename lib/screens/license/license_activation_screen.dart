@@ -1,0 +1,535 @@
+// license_activation_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../models/license_model.dart';
+import '../../providers/license_provider.dart';
+import '../../services/storage_service.dart';
+
+class LicenseActivationScreen extends StatefulWidget {
+  const LicenseActivationScreen({super.key});
+
+  @override
+  State<LicenseActivationScreen> createState() => _LicenseActivationScreenState();
+}
+
+class _LicenseActivationScreenState extends State<LicenseActivationScreen> with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final _licenseKeyController = TextEditingController();
+  final _emailController = TextEditingController();
+  LicenseType _selectedType = LicenseType.demo;
+  bool _isActivating = false;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedLicenseKey();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 0.5),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+    _animationController.forward();
+  }
+
+  Future<void> _loadSavedLicenseKey() async {
+    final savedEmail = await StorageService.instance.getValue('license_email');
+    final savedKey = await StorageService.instance.getValue('license_key');
+    if (savedEmail != null && savedKey != null) {
+      setState(() {
+        _emailController.text = savedEmail;
+        _licenseKeyController.text = savedKey;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _licenseKeyController.dispose();
+    _emailController.dispose();
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _activateLicense() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isActivating = true);
+
+    try {
+      final licenseKey = _licenseKeyController.text.trim();
+      final email = _emailController.text.trim();
+      
+      // Determine license type from key prefix
+      LicenseType type;
+      if (licenseKey.startsWith('DEMO-')) {
+        type = LicenseType.demo;
+      } else if (licenseKey.startsWith('PRO-')) {
+        type = LicenseType.professional;
+      } else if (licenseKey.startsWith('ENT-')) {
+        type = LicenseType.enterprise;
+      } else {
+        setState(() => _isActivating = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid license key format'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Save license details
+      await StorageService.instance.saveValue('license_email', email);
+      await StorageService.instance.saveValue('license_key', licenseKey);
+
+      final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
+      final success = await licenseProvider.activateLicense(
+        licenseKey,
+        email,
+        type,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('License activated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(licenseProvider.error ?? 'Failed to activate license'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error activating license: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isActivating = false);
+      }
+    }
+  }
+
+  Future<void> _launchWebsite() async {
+    final uri = Uri.parse('https://rajdipk.github.io/Ledgerpro-Extended/');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.teal[400],
+      body: Container(
+        decoration: BoxDecoration(
+          color: Colors.teal[400],
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 20),
+                  Center(
+                    child: AnimatedTextKit(
+                      animatedTexts: [
+                        TypewriterAnimatedText(
+                          'Choose Your Plan',
+                          textStyle: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          speed: const Duration(milliseconds: 100),
+                        ),
+                      ],
+                      totalRepeatCount: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton.icon(
+                    onPressed: _launchWebsite,
+                    icon: const Icon(Icons.info_outline, color: Colors.white),
+                    label: const Text(
+                      'View detailed features on our website',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: _buildPlanCards(),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: _buildLicenseDetailsCard(),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: _buildActivateButton(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanCards() {
+    return SizedBox(
+      height: 400,
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(width: 20),  
+              _buildPlanCard(
+                LicenseType.demo,
+                'Demo',
+                'Try it out',
+                Colors.teal[800]!,
+                const [
+                  PlanFeature(Icons.people_outline, '10 Customers'),
+                  PlanFeature(Icons.inventory_2_outlined, '50 Items'),
+                  PlanFeature(Icons.receipt_long_outlined, '20 Invoices'),
+                  PlanFeature(Icons.timer_outlined, '30 Days'),
+                  PlanFeature(Icons.block_outlined, 'No Export'),
+                ],
+              ),
+              const SizedBox(width: 20),
+              _buildPlanCard(
+                LicenseType.professional,
+                'Professional',
+                'Most Popular',
+                Colors.teal[900]!,
+                const [
+                  PlanFeature(Icons.people, '1,000 Customers'),
+                  PlanFeature(Icons.inventory_2, '5,000 Items'),
+                  PlanFeature(Icons.receipt_long, '1,000 Invoices'),
+                  PlanFeature(Icons.picture_as_pdf, 'PDF Export'),
+                  PlanFeature(Icons.qr_code_scanner, 'Barcode Scanner'),
+                ],
+              ),
+              const SizedBox(width: 20),
+              _buildPlanCard(
+                LicenseType.enterprise,
+                'Enterprise',
+                'Full Power',
+                Colors.teal[700]!,
+                const [
+                  PlanFeature(Icons.all_inclusive, 'Unlimited Everything'),
+                  PlanFeature(Icons.api, 'API Access'),
+                  PlanFeature(Icons.business, 'Multi-Business'),
+                  PlanFeature(Icons.analytics, 'Advanced Analytics'),
+                  PlanFeature(Icons.support_agent, 'Priority Support'),
+                ],
+              ),
+              const SizedBox(width: 20),  
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanCard(
+    LicenseType type,
+    String title,
+    String subtitle,
+    Color color,
+    List<PlanFeature> features,
+  ) {
+    final isSelected = _selectedType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedType = type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 280,
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+          border: isSelected
+              ? Border.all(color: Colors.white, width: 3)
+              : null,
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : color,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isSelected ? Colors.white70 : Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: features.map((feature) {
+                    return Row(
+                      children: [
+                        Icon(
+                          feature.icon,
+                          color: isSelected ? Colors.white : color,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Text(
+                            feature.text,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isSelected ? Colors.white : Colors.grey.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLicenseDetailsCard() {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.grey.shade50],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'License Details',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.teal[900],
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+              keyboardType: TextInputType.emailAddress,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your email';
+                }
+                if (!value.contains('@')) {
+                  return 'Please enter a valid email';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _licenseKeyController,
+              decoration: InputDecoration(
+                labelText: 'License Key',
+                prefixIcon: const Icon(Icons.vpn_key_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9\-]')),
+                LicenseKeyFormatter(),
+              ],
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your license key';
+                }
+                // Format should match the demo keys: DEMO-1234-5678-9012
+                final validKeyFormat = RegExp(r'^(DEMO|PRO|ENT)-[0-9]{4}-[0-9]{4}-[0-9]{4}$');
+                if (!validKeyFormat.hasMatch(value)) {
+                  return 'Invalid license key format. Example: PRO-1234-5678-9012';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivateButton() {
+    return ElevatedButton(
+      onPressed: _isActivating ? null : _activateLicense,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.teal[900],
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
+      ),
+      child: _isActivating
+          ? const SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(),
+            )
+          : const Text(
+              'Activate License',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+    );
+  }
+}
+
+class PlanFeature {
+  final IconData icon;
+  final String text;
+
+  const PlanFeature(this.icon, this.text);
+}
+
+class LicenseKeyFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Convert to uppercase
+    var text = newValue.text.toUpperCase();
+    
+    // Remove any extra hyphens
+    text = text.replaceAll('-', '');
+    
+    // Limit to 16 characters (TYPE + 12 numbers)
+    if (text.length > 16) {
+      text = text.substring(0, 16);
+    }
+
+    // Format with hyphens
+    final buffer = StringBuffer();
+    
+    // Handle the license type prefix (DEMO, PRO, ENT)
+    if (text.length <= 4) {
+      buffer.write(text);
+    } else {
+      // Add the type prefix
+      buffer.write(text.substring(0, 3));
+      buffer.write('-');
+      
+      // Add the remaining numbers in groups of 4
+      var remainingDigits = text.substring(3);
+      for (var i = 0; i < remainingDigits.length; i++) {
+        if (i > 0 && i % 4 == 0 && i <= 12) {
+          buffer.write('-');
+        }
+        buffer.write(remainingDigits[i]);
+      }
+    }
+
+    final string = buffer.toString();
+    return TextEditingValue(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}

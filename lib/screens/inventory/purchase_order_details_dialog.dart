@@ -1249,6 +1249,7 @@ class _PurchaseOrderDetailsDialogState
           .name;
 
       final pdfBytes = await PdfService.generatePurchaseOrderPdf(
+        context: context,
         order: widget.order,
         supplier: businessProvider.selectedSupplier!,
         items: items,

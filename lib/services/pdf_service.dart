@@ -7,15 +7,42 @@ import '../models/purchase_order_model.dart';
 import '../models/supplier_model.dart';
 import '../models/inventory_item_model.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/license_provider.dart';
 
 class PdfService {
+  static Future<bool> canExportPdf(BuildContext context) async {
+    final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
+    final canExport = await licenseProvider.isFeatureAvailable('pdf_export');
+    
+    if (!canExport) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'PDF export is only available in Professional and Enterprise licenses. Please upgrade to use this feature.',
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+    
+    return canExport;
+  }
+
   static Future<Uint8List> generatePurchaseOrderPdf({
+    required BuildContext context,
     required PurchaseOrder order,
     required Supplier supplier,
     required List<InventoryItem> items,
     required String businessName,
     required String currency,
   }) async {
+    if (!await canExportPdf(context)) {
+      return Uint8List(0);
+    }
+
     final pdf = pw.Document();
 
     // Load custom font
@@ -51,13 +78,19 @@ class PdfService {
   }
 
   static Future<void> printPurchaseOrder({
+    required BuildContext context,
     required PurchaseOrder order,
     required Supplier supplier,
     required List<InventoryItem> items,
     required String businessName,
     required String currency,
   }) async {
+    if (!await canExportPdf(context)) {
+      return;
+    }
+
     final pdfBytes = await generatePurchaseOrderPdf(
+      context: context,
       order: order,
       supplier: supplier,
       items: items,

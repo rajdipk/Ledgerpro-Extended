@@ -19,10 +19,14 @@ import 'providers/currency_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/inventory_provider.dart';
 import 'providers/bill_provider.dart';
+import 'providers/license_provider.dart';
 import 'screens/navigation_panel.dart';
 import 'screens/settings.dart';
 import 'mannuals/user_manual_screen.dart';
 import 'screens/billing/billing_screen.dart';
+import 'services/storage_service.dart'; // Import StorageService
+import 'services/notification_service.dart'; // Import NotificationService
+import 'services/backup_service.dart'; // Import BackupService
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -65,6 +69,11 @@ Future<void> main() async {
       await DatabaseHelper.instance.database;
       debugPrint('Database initialized');
 
+      // Initialize services
+      await NotificationService.instance.initialize();
+      await StorageService.instance.initialize();
+      BackupService().startAutoBackup();
+
       runApp(
         MultiProvider(
           providers: [
@@ -73,6 +82,7 @@ Future<void> main() async {
             ChangeNotifierProvider(create: (_) => CurrencyProvider()),
             ChangeNotifierProvider(create: (_) => InventoryProvider()),
             ChangeNotifierProvider(create: (_) => BillProvider()),
+            ChangeNotifierProvider(create: (_) => LicenseProvider()),
           ],
           child: const MyApp(),
         ),

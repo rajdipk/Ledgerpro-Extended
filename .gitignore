@@ -54,3 +54,6 @@ android/app/ledgerpro.keystore
 # Specific executables
 innosetup.exe
 backend/node_modules/nodemon/bin/windows-kill.exe
+
+# Google Sign In credentials
+windows/flutter/google_sign_in_windows.json

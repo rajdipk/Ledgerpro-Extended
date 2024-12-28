@@ -141,6 +141,12 @@ Configure the following secrets in your GitHub repository:
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
 
+## Google Sign In Setup
+
+1. Copy `windows/flutter/google_sign_in_windows.template.json` to `windows/flutter/google_sign_in_windows.json`
+2. Replace the placeholder values with your actual Google OAuth credentials
+3. Never commit the `google_sign_in_windows.json` file as it contains sensitive information
+
 ## Development Guidelines
 
 ### Branch Structure

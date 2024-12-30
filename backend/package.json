@@ -19,10 +19,10 @@
     "nodemailer": "^6.9.7",
     "razorpay": "^2.9.2"
   },
-  "engines": {
-    "node": "18.19.0"
-  },
   "devDependencies": {
     "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }

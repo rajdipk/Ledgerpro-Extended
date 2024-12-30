@@ -2,6 +2,7 @@ services:
   - type: web
     name: ledgerpro-extended
     env: node
+    nodeVersion: 18.19.0
     region: singapore
     plan: free
     buildCommand: npm install

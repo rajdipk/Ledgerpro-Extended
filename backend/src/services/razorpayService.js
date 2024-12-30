@@ -10,7 +10,7 @@ class RazorpayService {
         });
 
         this.prices = {
-            professional: 999, // ₹999 INR
+            professional: 599, // ₹599 INR
             enterprise: 0 // Custom pricing
         };
     }

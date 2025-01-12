@@ -101,6 +101,8 @@ exports.updatePricing = async (req, res) => {
 
 exports.createCustomer = async (req, res) => {
     try {
+        console.log('Creating customer with data:', req.body);
+
         const {
             businessName,
             email,
@@ -110,10 +112,18 @@ exports.createCustomer = async (req, res) => {
             licenseType
         } = req.body;
 
+        // Validate required fields
+        if (!businessName || !email || !phone || !industry || !platform || !licenseType) {
+            throw new Error('Missing required fields');
+        }
+
         // Check if email exists
         const existingCustomer = await Customer.findOne({ email: email.toLowerCase() });
         if (existingCustomer) {
-            throw new Error('Email already registered');
+            return res.status(400).json({
+                success: false,
+                error: 'Email already registered'
+            });
         }
 
         // Create new customer
@@ -126,19 +136,26 @@ exports.createCustomer = async (req, res) => {
             license: {
                 type: licenseType,
                 status: licenseType === 'demo' ? 'active' : 'pending',
-                key: licenseType === 'demo' ? require('../utils/license').generateLicenseKey() : null
+                key: licenseType === 'demo' ? require('../utils/license').generateLicenseKey() : null,
+                endDate: licenseType === 'demo' ? 
+                    new Date(Date.now() + (30 * 24 * 60 * 60 * 1000)) : // 30 days for demo
+                    null
             }
         });
 
         await customer.save();
+        console.log('Customer created successfully:', customer);
 
-        res.json({
+        res.status(201).json({
             success: true,
             message: 'Customer created successfully',
             data: customer
         });
     } catch (error) {
         console.error('Create customer error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to create customer'
+        });
     }
 };

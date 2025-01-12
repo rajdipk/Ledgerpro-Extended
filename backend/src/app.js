@@ -27,10 +27,23 @@ wss.on('connection', (ws) => {
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3000', 'https://ledgerpro-extended.onrender.com'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'x-admin-token']
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Add request logging middleware
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`, {
+        body: req.body,
+        headers: req.headers
+    });
+    next();
+});
 
 // Serve static files from docs directory
 app.use(express.static(path.join(__dirname, '../../docs')));
@@ -41,10 +54,13 @@ app.use('/api/admin', adminRoutes); // Add admin routes
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ 
-        success: false, 
-        error: 'Something went wrong!' 
+    console.error('Error:', err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    res.status(err.status || 500).json({
+        success: false,
+        error: err.message || 'Something went wrong!'
     });
 });
 

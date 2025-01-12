@@ -9,7 +9,7 @@ const customerSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true,
+        unique: true, // This already creates an index
         lowercase: true,
         trim: true
     },
@@ -43,17 +43,34 @@ const customerSchema = new mongoose.Schema({
         },
         endDate: Date
     },
+    razorpayOrderId: String,
+    razorpayPaymentId: String,
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
 
-// Add indexes for better query performance
-customerSchema.index({ email: 1 }, { unique: true });
+// Add only necessary indexes (email is already indexed due to unique: true)
 customerSchema.index({ 'license.status': 1 });
 customerSchema.index({ 'license.type': 1 });
 customerSchema.index({ createdAt: -1 });
+
+// Add methods
+customerSchema.methods.isLicenseValid = function() {
+    if (this.license.status !== 'active') return false;
+    if (!this.license.endDate) return true;
+    return new Date() < this.license.endDate;
+};
+
+customerSchema.methods.canDownload = function(platform) {
+    return this.platform === platform && this.isLicenseValid();
+};
+
+// Static methods
+customerSchema.statics.findByLicenseKey = function(licenseKey) {
+    return this.findOne({ 'license.key': licenseKey });
+};
 
 const Customer = mongoose.model('Customer', customerSchema);
 module.exports = Customer;

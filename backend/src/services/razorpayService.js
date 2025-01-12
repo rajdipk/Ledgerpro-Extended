@@ -94,6 +94,24 @@ class RazorpayService {
             throw new Error('Failed to fetch payment details');
         }
     }
+
+    updatePricing(professional, enterprise) {
+        console.log('Updating pricing:', { professional, enterprise });
+        
+        // Validate inputs
+        if (typeof professional !== 'number' || professional < 0) {
+            throw new Error('Invalid professional price');
+        }
+        if (typeof enterprise !== 'number' || enterprise < 0) {
+            throw new Error('Invalid enterprise price');
+        }
+
+        this.prices.professional = professional;
+        this.prices.enterprise = enterprise;
+
+        // Here you might want to persist the pricing to a database
+        // or configuration file in a production environment
+    }
 }
 
 module.exports = new RazorpayService();

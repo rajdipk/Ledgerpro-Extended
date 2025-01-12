@@ -196,7 +196,7 @@
 
         .btn-outline-primary {
             color: var(--primary);
-            border-color: var(--primary);
+            border-color: var (--primary);
         }
 
         .btn-outline-primary:hover {
@@ -513,7 +513,7 @@
                     <div class="pricing-card">
                         <div class="ribbon">Most Popular</div>
                         <h3>Professional</h3>
-                        <div class="price">₹599<span class="price-duration">/month</span></div>
+                        <div class="price professional-price">₹599<span class="price-duration">/month</span></div>
                         <ul class="pricing-features">
                             <li><i class="bi bi-check-circle-fill text-success"></i> All Demo Features</li>
                             <li><i class="bi bi-check-circle-fill text-success"></i> Inventory Management</li>
@@ -528,7 +528,7 @@
                 <div class="col-md-4">
                     <div class="pricing-card">
                         <h3>Enterprise</h3>
-                        <div class="price">Custom<span class="price-duration">/pricing</span></div>
+                        <div class="price enterprise-price">Custom<span class="price-duration">/pricing</span></div>
                         <ul class="pricing-features">
                             <li><i class="bi bi-check-circle-fill text-success"></i> Custom Features</li>
                             <li><i class="bi bi-check-circle-fill text-success"></i> 24/7 Support</li>
@@ -581,7 +581,7 @@
                             <select class="form-select" id="licenseType" name="licenseType" required>
                                 <option value="" selected>Select Your License Type</option>
                                 <option value="demo">Demo Version - Free Forever</option>
-                                <option value="professional">Professional License - $10/month</option>
+                                <option value="professional">Professional License - ₹599/month</option>
                                 <option value="enterprise">Enterprise License - Custom Pricing</option>
                             </select>
                         </div>
@@ -992,6 +992,59 @@
                 preloader.style.display = 'none';
             }, 500);
         });
+
+        // Initialize WebSocket connection
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname;
+        const wsPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+        const ws = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}`);
+
+        ws.onmessage = function(event) {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'PRICE_UPDATE') {
+                    // Update professional price display
+                    const professionalPriceElements = document.querySelectorAll('.professional-price');
+                    professionalPriceElements.forEach(element => {
+                        element.textContent = `₹${message.data.professional}`;
+                    });
+
+                    // Update enterprise price display if needed
+                    if (message.data.enterprise > 0) {
+                        const enterprisePriceElements = document.querySelectorAll('.enterprise-price');
+                        enterprisePriceElements.forEach(element => {
+                            element.textContent = `₹${message.data.enterprise}`;
+                        });
+                    }
+
+                    // Update license type select options
+                    const licenseTypeSelect = document.getElementById('licenseType');
+                    if (licenseTypeSelect) {
+                        const professionalOption = Array.from(licenseTypeSelect.options).find(
+                            option => option.value === 'professional'
+                        );
+                        if (professionalOption) {
+                            professionalOption.textContent = 
+                                `Professional License - ₹${message.data.professional}/month`;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing WebSocket message:', error);
+            }
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket connection closed');
+            // Attempt to reconnect after 5 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 5000);
+        };
     </script>
 </body>
 </html>

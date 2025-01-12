@@ -59,6 +59,8 @@ dependencies:
   googleapis_auth: ^1.4.1
   google_sign_in: ^6.1.6
   shared_preferences: ^2.3.4
+  flutter_plugin_android_lifecycle: ^2.0.22
+
 
   package_info_plus: ^4.2.0
   window_manager: ^0.3.9

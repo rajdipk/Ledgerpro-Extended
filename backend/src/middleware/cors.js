@@ -9,26 +9,22 @@ const corsOptions = {
             'https://rajdipk.github.io'
         ];
         
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+        // Allow all origins in development
+        if (process.env.NODE_ENV === 'development') {
+            callback(null, true);
+            return;
+        }
         
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-        'Content-Type',
-        'x-admin-token',
-        'Authorization',
-        'Access-Control-Allow-Headers',
-        'Origin',
-        'Accept'
-    ],
     credentials: true,
-    optionsSuccessStatus: 200
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-admin-token', 'Authorization'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range']
 };
 
 module.exports = cors(corsOptions);

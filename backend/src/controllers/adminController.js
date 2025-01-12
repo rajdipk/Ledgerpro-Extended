@@ -112,9 +112,27 @@ exports.createCustomer = async (req, res) => {
             licenseType
         } = req.body;
 
-        // Validate required fields
-        if (!businessName || !email || !phone || !industry || !platform || !licenseType) {
-            throw new Error('Missing required fields');
+        // Enhanced validation
+        const validationErrors = [];
+        if (!businessName?.trim()) validationErrors.push('Business name is required');
+        if (!email?.trim()) validationErrors.push('Email is required');
+        if (!phone?.trim()) validationErrors.push('Phone is required');
+        if (!['retail', 'manufacturing', 'services', 'other'].includes(industry)) {
+            validationErrors.push('Invalid industry');
+        }
+        if (!['windows', 'android'].includes(platform)) {
+            validationErrors.push('Invalid platform');
+        }
+        if (!['demo', 'professional', 'enterprise'].includes(licenseType)) {
+            validationErrors.push('Invalid license type');
+        }
+
+        if (validationErrors.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                validationErrors
+            });
         }
 
         // Check if email exists
@@ -126,11 +144,11 @@ exports.createCustomer = async (req, res) => {
             });
         }
 
-        // Create new customer
+        // Create new customer with proper license settings
         const customer = new Customer({
-            businessName,
-            email: email.toLowerCase(),
-            phone,
+            businessName: businessName.trim(),
+            email: email.toLowerCase().trim(),
+            phone: phone.trim(),
             industry,
             platform,
             license: {

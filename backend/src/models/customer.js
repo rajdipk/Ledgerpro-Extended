@@ -10,8 +10,8 @@ const customerSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
-        trim: true,
-        lowercase: true
+        lowercase: true,
+        trim: true
     },
     phone: {
         type: String,
@@ -21,120 +21,39 @@ const customerSchema = new mongoose.Schema({
     industry: {
         type: String,
         required: true,
-        enum: ['retail', 'wholesale', 'manufacturing', 'services', 'other']
+        enum: ['retail', 'manufacturing', 'services', 'other']
     },
     platform: {
         type: String,
         required: true,
         enum: ['windows', 'android']
     },
-    businessNeeds: {
-        type: String,
-        trim: true
-    },
-    razorpayOrderId: {
-        type: String,
-        sparse: true
-    },
-    razorpayPaymentId: {
-        type: String,
-        sparse: true
-    },
-    razorpaySignature: {
-        type: String,
-        sparse: true
-    },
-    razorpayCustomerId: {
-        type: String,
-        sparse: true
-    },
     license: {
         type: {
             type: String,
-            enum: ['demo', 'professional', 'enterprise'],
-            required: true
+            required: true,
+            enum: ['demo', 'professional', 'enterprise']
         },
-        key: {
-            type: String,
-            unique: true,
-            sparse: true
-        },
+        key: String,
         status: {
             type: String,
-            enum: ['pending', 'active', 'expired', 'payment_failed', 'cancelled'],
+            required: true,
+            enum: ['active', 'pending', 'expired', 'cancelled'],
             default: 'pending'
         },
-        endDate: {
-            type: Date
-        },
-        activationDate: {
-            type: Date
-        },
-        lastVerified: {
-            type: Date
-        },
-        startDate: {
-            type: Date,
-            default: Date.now
-        }
+        endDate: Date
     },
-    downloads: [{
-        platform: String,
-        version: String,
-        timestamp: {
-            type: Date,
-            default: Date.now
-        },
-        ip: String
-    }],
-    paymentHistory: [{
-        orderId: String,
-        paymentId: String,
-        amount: Number,
-        currency: String,
-        status: String,
-        timestamp: {
-            type: Date,
-            default: Date.now
-        }
-    }]
-}, {
-    timestamps: true
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 });
 
-// Create compound index for email and license key
-customerSchema.index({ email: 1, 'license.key': 1 });
-
-// Methods
-customerSchema.methods.isLicenseValid = function() {
-    if (!this.license.key || this.license.status !== 'active') {
-        return false;
-    }
-
-    if (this.license.type === 'demo') {
-        return true;
-    }
-
-    return this.license.endDate && new Date() <= this.license.endDate;
-};
-
-customerSchema.methods.canDownload = function(platform) {
-    return this.isLicenseValid() && this.platform === platform;
-};
-
-// Statics
-customerSchema.statics.findByLicenseKey = async function(licenseKey) {
-    return this.findOne({ 'license.key': licenseKey });
-};
-
-// Middleware
-customerSchema.pre('save', function(next) {
-    if (this.isModified('license.status') && this.license.status === 'active' && !this.license.activationDate) {
-        this.license.activationDate = new Date();
-    }
-    next();
-});
+// Add indexes for better query performance
+customerSchema.index({ email: 1 }, { unique: true });
+customerSchema.index({ 'license.status': 1 });
+customerSchema.index({ 'license.type': 1 });
+customerSchema.index({ createdAt: -1 });
 
 const Customer = mongoose.model('Customer', customerSchema);
-
 module.exports = Customer;

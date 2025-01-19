@@ -993,58 +993,131 @@
             }, 500);
         });
 
-        // Initialize WebSocket connection
+        // Initialize WebSocket connection with the new client
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.hostname;
-        const wsPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
-        const ws = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}`);
+        const wsHost = window.location.hostname === 'localhost' ? 
+            'localhost:3000' : 
+            'ledgerpro-extended.onrender.com';
+        
+        const wsClient = new WebSocketClient(`${wsProtocol}//${wsHost}`);
 
-        ws.onmessage = function(event) {
-            try {
-                const message = JSON.parse(event.data);
-                if (message.type === 'PRICE_UPDATE') {
-                    // Update professional price display
-                    const professionalPriceElements = document.querySelectorAll('.professional-price');
-                    professionalPriceElements.forEach(element => {
-                        element.textContent = `₹${message.data.professional}`;
-                    });
+        // Clean up WebSocket connection on page unload
+        window.addEventListener('unload', () => {
+            wsClient.close();
+        });
 
-                    // Update enterprise price display if needed
-                    if (message.data.enterprise > 0) {
-                        const enterprisePriceElements = document.querySelectorAll('.enterprise-price');
-                        enterprisePriceElements.forEach(element => {
-                            element.textContent = `₹${message.data.enterprise}`;
-                        });
+        // Handle visibility change to manage connection
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                wsClient.close();
+            } else {
+                wsClient.connect();
+            }
+        });
+
+        class WebSocketClient {
+            constructor(url, options = {}) {
+                this.url = url;
+                this.options = {
+                    reconnectInterval: 2000,
+                    maxReconnectAttempts: 5,
+                    ...options
+                };
+                this.reconnectAttempts = 0;
+                this.connect();
+            }
+
+            connect() {
+                try {
+                    this.ws = new WebSocket(this.url);
+                    this.addEventListeners();
+                } catch (error) {
+                    console.error('WebSocket connection error:', error);
+                    this.handleReconnect();
+                }
+            }
+
+            addEventListeners() {
+                this.ws.onmessage = this.handleMessage.bind(this);
+                this.ws.onerror = this.handleError.bind(this);
+                this.ws.onclose = this.handleClose.bind(this);
+                this.ws.onopen = this.handleOpen.bind(this);
+            }
+
+            handleMessage(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'PRICE_UPDATE') {
+                        this.updatePrices(message.data);
                     }
+                } catch (error) {
+                    console.error('Error processing WebSocket message:', error);
+                }
+            }
 
-                    // Update license type select options
-                    const licenseTypeSelect = document.getElementById('licenseType');
-                    if (licenseTypeSelect) {
-                        const professionalOption = Array.from(licenseTypeSelect.options).find(
-                            option => option.value === 'professional'
-                        );
-                        if (professionalOption) {
-                            professionalOption.textContent = 
-                                `Professional License - ₹${message.data.professional}/month`;
-                        }
+            updatePrices(data) {
+                // Update professional price display
+                const professionalPriceElements = document.querySelectorAll('.professional-price');
+                professionalPriceElements.forEach(element => {
+                    element.textContent = `₹${data.professional}`;
+                });
+
+                // Update enterprise price display if needed
+                if (data.enterprise > 0) {
+                    const enterprisePriceElements = document.querySelectorAll('.enterprise-price');
+                    enterprisePriceElements.forEach(element => {
+                        element.textContent = `₹${data.enterprise}`;
+                    });
+                }
+
+                // Update license type select options
+                const licenseTypeSelect = document.getElementById('licenseType');
+                if (licenseTypeSelect) {
+                    const professionalOption = Array.from(licenseTypeSelect.options).find(
+                        option => option.value === 'professional'
+                    );
+                    if (professionalOption) {
+                        professionalOption.textContent = 
+                            `Professional License - ₹${data.professional}/month`;
                     }
                 }
-            } catch (error) {
-                console.error('Error processing WebSocket message:', error);
             }
-        };
 
-        ws.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
+            handleError(error) {
+                console.error('WebSocket error:', error);
+            }
 
-        ws.onclose = function() {
-            console.log('WebSocket connection closed');
-            // Attempt to reconnect after 5 seconds
-            setTimeout(() => {
-                location.reload();
-            }, 5000);
-        };
+            handleClose(event) {
+                console.log('WebSocket connection closed:', event.code, event.reason);
+                this.handleReconnect();
+            }
+
+            handleOpen() {
+                console.log('WebSocket connected successfully');
+                this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+            }
+
+            handleReconnect() {
+                if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    console.log(`Reconnection attempt ${this.reconnectAttempts} of ${this.options.maxReconnectAttempts}`);
+                    
+                    setTimeout(() => {
+                        this.connect();
+                    }, this.options.reconnectInterval);
+                } else {
+                    console.log('Max reconnection attempts reached. Please refresh the page manually.');
+                    // Optionally show a user-friendly message
+                    showMessage('Connection lost. Please refresh the page.', 'warning');
+                }
+            }
+
+            close() {
+                if (this.ws) {
+                    this.ws.close();
+                }
+            }
+        }
     </script>
 </body>
 </html>

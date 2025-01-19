@@ -109,8 +109,22 @@ class RazorpayService {
         this.prices.professional = professional;
         this.prices.enterprise = enterprise;
 
-        // Here you might want to persist the pricing to a database
-        // or configuration file in a production environment
+        // Broadcast price update to all connected WebSocket clients
+        if (global.wss) {
+            const message = JSON.stringify({
+                type: 'PRICE_UPDATE',
+                data: { 
+                    professional: this.prices.professional,
+                    enterprise: this.prices.enterprise
+                }
+            });
+
+            global.wss.clients.forEach(client => {
+                if (client.readyState === 1) { // WebSocket.OPEN
+                    client.send(message);
+                }
+            });
+        }
     }
 }
 

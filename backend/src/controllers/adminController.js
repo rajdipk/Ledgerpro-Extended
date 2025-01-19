@@ -31,9 +31,13 @@ exports.getDashboard = async (req, res) => {
 
 exports.getCustomers = async (req, res) => {
     try {
+        console.log('Getting customers list, auth token:', req.headers['x-admin-token']);
+        
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
+
+        console.log('Query parameters:', { page, limit, skip });
 
         const customers = await Customer.find()
             .select('businessName email license.type license.status license.key license.endDate createdAt')
@@ -42,6 +46,12 @@ exports.getCustomers = async (req, res) => {
             .limit(limit);
 
         const total = await Customer.countDocuments();
+
+        console.log('Found customers:', {
+            count: customers.length,
+            total,
+            pages: Math.ceil(total / limit)
+        });
 
         res.json({
             success: true,

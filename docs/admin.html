@@ -205,24 +205,25 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // API Configuration
+        // Update API configuration
         const API_CONFIG = {
             BASE_URL: window.location.hostname === 'localhost' 
                 ? 'http://localhost:3000' 
                 : 'https://ledgerpro-extended.onrender.com',
-            ADMIN_TOKEN: '3562',
-            DEFAULT_HEADERS: {
-                'Content-Type': 'application/json',
-                'x-admin-token': '3562'
-            }
+            ADMIN_TOKEN: '3562'
         };
 
-        // Update apiCall function with better error handling
+        // Update apiCall function
         async function apiCall(endpoint, options = {}) {
             const defaultOptions = {
-                headers: API_CONFIG.DEFAULT_HEADERS,
                 mode: 'cors',
-                credentials: 'include'
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'x-admin-token': API_CONFIG.ADMIN_TOKEN,
+                    'Origin': window.location.origin
+                }
             };
 
             const finalOptions = {
@@ -235,9 +236,13 @@
             };
 
             try {
-                console.log(`Making API call to ${endpoint}:`, finalOptions);
+                console.log(`Making API call to ${endpoint}:`, {
+                    url: `${API_CONFIG.BASE_URL}${endpoint}`,
+                    ...finalOptions
+                });
+
                 const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, finalOptions);
-                
+
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({
                         error: `HTTP error! status: ${response.status}`
@@ -245,9 +250,7 @@
                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 }
 
-                const data = await response.json();
-                console.log(`API response from ${endpoint}:`, data);
-                return data;
+                return await response.json();
             } catch (error) {
                 console.error(`API call failed for ${endpoint}:`, error);
                 throw error;

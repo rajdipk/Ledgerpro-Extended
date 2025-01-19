@@ -9,7 +9,7 @@ const path = require('path');
 // Import routes
 const customerRoutes = require('./routes/customerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const corsMiddleware = require('./middleware/cors');
+const corsOptions = require('./middleware/cors');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,10 +28,20 @@ wss.on('connection', (ws) => {
 
 // Middleware
 app.use(helmet());
-app.use(corsMiddleware);
+app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
+
+// Add headers middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', true);
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-admin-token');
+    next();
+});
 
 // Add request logging middleware
 app.use((req, res, next) => {

@@ -718,13 +718,18 @@ CREATE TABLE IF NOT EXISTS license (
     return count ?? 0;
   }
 
-  Future<int> getCustomerCount(int businessId) async {
+  Future<int> getCustomerCount([int? businessId]) async {
     final db = await database;
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
-      [businessId]
-    );
-    return Sqflite.firstIntValue(result) ?? 0;
+    if (businessId != null) {
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
+        [businessId]
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    } else {
+      final result = await db.rawQuery('SELECT COUNT(*) as count FROM customers');
+      return Sqflite.firstIntValue(result) ?? 0;
+    }
   }
 
   // Update customer balance
@@ -2602,5 +2607,23 @@ CREATE TABLE IF NOT EXISTS license (
       }
     }
     return result;
+  }
+
+  Future<int> getInventoryCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM inventory_items');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getMonthlyTransactionCount() async {
+    final db = await database;
+    final startOfMonth = DateTime.now().subtract(
+      Duration(days: DateTime.now().day - 1)
+    );
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM transactions WHERE date >= ?',
+      [startOfMonth.toIso8601String()]
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 }

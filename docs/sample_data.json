@@ -1,0 +1,24 @@
+{
+  "_id": ObjectId("65ac123456789abcdef12345"),
+  "businessName": "Pro Mart",
+  "email": "pro@example.com",
+  "phone": "+911234567890",
+  "industry": "retail",
+  "platform": "windows",
+  "businessNeeds": "Need inventory management and billing system",
+  "licenseType": "professional",
+  "licenseKey": "PRO-2024-XXXX-YYYY-ZZZZ",
+  "status": "active",
+  "registrationDate": ISODate("2024-01-20T08:30:00.000Z"),
+  "lastLoginDate": ISODate("2024-01-20T10:15:00.000Z"),
+  "subscription": {
+    "orderId": "order_ProMart1234ABC",
+    "paymentId": "pay_ProMart5678DEF",
+    "startDate": ISODate("2024-01-20T08:30:00.000Z"),
+    "endDate": ISODate("2024-02-20T08:30:00.000Z"),
+    "status": "active"
+  },
+  "createdAt": ISODate("2024-01-20T08:30:00.000Z"),
+  "updatedAt": ISODate("2024-01-20T08:30:00.000Z"),
+  "__v": 0
+}

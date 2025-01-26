@@ -1,6 +1,4 @@
 // license_model.dart
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
 
 enum LicenseType {
   demo,

@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../../models/bill_model.dart';
 import '../../providers/bill_provider.dart';
 import '../../providers/business_provider.dart';
@@ -103,6 +102,10 @@ class _BillingScreenState extends State<BillingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get screen width to determine layout
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrowScreen = screenWidth < 600;
+
     return Shortcuts(
       shortcuts: KeyboardShortcutsService.getShortcuts(context),
       child: Actions(
@@ -115,124 +118,170 @@ class _BillingScreenState extends State<BillingScreen> {
           autofocus: true,
           child: Scaffold(
             appBar: AppBar(
+              // Make app bar more responsive
+              toolbarHeight: isNarrowScreen ? kToolbarHeight : 80,
+              automaticallyImplyLeading: isNarrowScreen,
               title: Consumer<BillProvider>(
                 builder: (context, provider, child) {
                   final bill = provider.currentBill;
-                  return Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.receipt_long,
-                          color:
-                              Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        bill?.customer == null
-                            ? 'New Bill'
-                            : 'Bill for ${bill!.customer.name}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  );
+                  return isNarrowScreen
+                      ? Text(bill?.customer == null
+                          ? 'New Bill'
+                          : 'Bill for ${bill!.customer.name}')
+                      : Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.receipt_long,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              bill?.customer == null
+                                  ? 'New Bill'
+                                  : 'Bill for ${bill!.customer.name}',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ],
+                        );
                 },
               ),
               actions: [
-                Consumer<BillProvider>(
-                  builder: (context, provider, child) {
-                    final bill = provider.currentBill;
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (bill?.customer != null) ...[
-                          FilledButton.icon(
-                            onPressed: () => _addItem(context),
-                            icon: const Icon(Icons.add_shopping_cart),
-                            label: const Text('Add Item'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              foregroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
+                if (!isNarrowScreen) ...{
+                  Consumer<BillProvider>(
+                    builder: (context, provider, child) {
+                      final bill = provider.currentBill;
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (bill?.customer != null) ...[
+                            FilledButton.icon(
+                              onPressed: () => _addItem(context),
+                              icon: const Icon(Icons.add_shopping_cart),
+                              label: const Text('Add Item'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (bill != null && bill.items.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          IconButton.outlined(
-                            icon: const Icon(Icons.close),
-                            style: IconButton.styleFrom(
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.error,
-                              side: BorderSide(
-                                  color: Theme.of(context).colorScheme.error),
-                            ),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (dialogContext) => AlertDialog(
-                                  title: const Text('Discard Bill?'),
-                                  content: const Text(
-                                      'Are you sure you want to discard this bill?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(dialogContext).pop(),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    FilledButton(
-                                      onPressed: () {
-                                        Navigator.of(dialogContext).pop();
-                                        provider.clearCurrentBill();
-                                        _notesController.clear();
-                                        _discountController.text = '0';
-                                        _gstRateController.text = '0';
-                                        _deliveryChargeController.text = '0';
-                                      },
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor:
-                                            Theme.of(context).colorScheme.error,
-                                        foregroundColor: Theme.of(context)
-                                            .colorScheme
-                                            .onError,
+                            const SizedBox(width: 8),
+                          ],
+                          if (bill != null && bill.items.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            IconButton.outlined(
+                              icon: const Icon(Icons.close),
+                              style: IconButton.styleFrom(
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.error,
+                                side: BorderSide(
+                                    color: Theme.of(context).colorScheme.error),
+                              ),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: const Text('Discard Bill?'),
+                                    content: const Text(
+                                        'Are you sure you want to discard this bill?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(dialogContext).pop(),
+                                        child: const Text('Cancel'),
                                       ),
-                                      child: const Text('Discard'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                                      FilledButton(
+                                        onPressed: () {
+                                          Navigator.of(dialogContext).pop();
+                                          provider.clearCurrentBill();
+                                          _notesController.clear();
+                                          _discountController.text = '0';
+                                          _gstRateController.text = '0';
+                                          _deliveryChargeController.text = '0';
+                                        },
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .error,
+                                          foregroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .onError,
+                                        ),
+                                        child: const Text('Discard'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                          const SizedBox(width: 16),
                         ],
-                        const SizedBox(width: 16),
-                      ],
-                    );
-                  },
-                ),
-                FilledButton.icon(
-                  icon: const Icon(Icons.receipt_long),
-                  label: const Text('View Bills'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor:
-                        Theme.of(context).colorScheme.secondaryContainer,
-                    foregroundColor:
-                        Theme.of(context).colorScheme.onSecondaryContainer,
+                      );
+                    },
                   ),
-                  onPressed: () {
-                    HomeScreen.of(context)
-                        .switchContent(const BillsScreen(), '/bills');
-                  },
-                ),
-                const SizedBox(width: 16),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.receipt_long),
+                    label: const Text('View Bills'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor:
+                          Theme.of(context).colorScheme.secondaryContainer,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                    onPressed: () {
+                      HomeScreen.of(context)
+                          .switchContent(const BillsScreen(), '/bills');
+                    },
+                  ),
+                  const SizedBox(width: 16),
+                } else
+                  PopupMenuButton(
+                    itemBuilder: (context) => [
+                      if (context.read<BillProvider>().currentBill?.customer !=
+                          null)
+                        const PopupMenuItem(
+                          value: 'add_item',
+                          child: Text('Add Item'),
+                        ),
+                      const PopupMenuItem(
+                        value: 'view_bills',
+                        child: Text('View Bills'),
+                      ),
+                      if (context.read<BillProvider>().currentBill != null)
+                        const PopupMenuItem(
+                          value: 'clear_bill',
+                          child: Text('Clear Bill'),
+                        ),
+                    ],
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'add_item':
+                          _addItem(context);
+                          break;
+                        case 'view_bills':
+                          HomeScreen.of(context)
+                              .switchContent(const BillsScreen(), '/bills');
+                          break;
+                        case 'clear_bill':
+                          context.read<BillProvider>().clearCurrentBill();
+                          break;
+                      }
+                    },
+                  ),
               ],
             ),
             body: Consumer<BillProvider>(
@@ -279,56 +328,122 @@ class _BillingScreenState extends State<BillingScreen> {
                   );
                 }
 
-                return Column(
-                  children: [
-                    if (bill.items.isEmpty)
-                      Container(
-                        margin: const EdgeInsets.all(16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer
-                              .withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                'Add items to the bill using the "Add Item" button above.',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: _buildBillItemsList(bill),
-                          ),
-                          if (bill.items.isNotEmpty)
-                            Expanded(
-                              flex: 2,
-                              child: _buildBalanceSummary(context, bill),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth < 600) {
+                      return _buildMobileLayout(bill);
+                    } else {
+                      return _buildDesktopLayout(bill);
+                    }
+                  },
                 );
               },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(Bill bill) {
+    return Column(
+      children: [
+        if (bill.items.isEmpty) _buildEmptyBillHint(),
+        Expanded(
+          child: _buildBillItemsList(bill),
+        ),
+        SafeArea(
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total:'),
+                      Text(
+                        '₹${bill.total.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () =>
+                              _showMobileBalanceSummary(context, bill),
+                          child: const Text('View Details'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => _saveBill(context),
+                          child: const Text('Save Bill'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout(Bill bill) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 3,
+          child: _buildBillItemsList(bill),
+        ),
+        if (bill.items.isNotEmpty)
+          Expanded(
+            flex: 2,
+            child: _buildBalanceSummary(context, bill),
+          ),
+      ],
+    );
+  }
+
+  void _showMobileBalanceSummary(BuildContext context, Bill bill) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Bill Details',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildBalanceSummaryContent(context, bill),
+              ],
             ),
           ),
         ),
@@ -817,5 +932,105 @@ class _BillingScreenState extends State<BillingScreen> {
         SnackBar(content: Text('Error saving bill: $e')),
       );
     }
+  }
+
+  Widget _buildEmptyBillHint() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              'Add items to the bill using the "Add Item" button above.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceSummaryContent(BuildContext context, Bill bill) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          title: const Text('Subtotal'),
+          trailing: Text('₹${bill.subTotal.toStringAsFixed(2)}'),
+        ),
+        if (bill.gstAmount > 0)
+          ListTile(
+            title: const Text('GST'),
+            trailing: Text('₹${bill.gstAmount.toStringAsFixed(2)}'),
+          ),
+        ListTile(
+          title: const Text('Delivery Charge'),
+          trailing: SizedBox(
+            width: 100,
+            child: TextField(
+              controller: _deliveryChargeController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                prefixText: '₹',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+              onChanged: (value) {
+                final charge = double.tryParse(value) ?? 0;
+                Provider.of<BillProvider>(context, listen: false)
+                    .updateDeliveryCharge(charge);
+              },
+            ),
+          ),
+        ),
+        ListTile(
+          title: const Text('Discount'),
+          trailing: SizedBox(
+            width: 100,
+            child: TextField(
+              controller: _discountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                prefixText: '₹',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+              onChanged: (value) {
+                final discount = double.tryParse(value) ?? 0;
+                Provider.of<BillProvider>(context, listen: false)
+                    .updateDiscount(discount);
+              },
+            ),
+          ),
+        ),
+        const Divider(),
+        ListTile(
+          title: const Text(
+            'Total',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          trailing: Text(
+            '₹${bill.total.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -16,10 +16,12 @@ class CustomerOperationsScreen extends StatefulWidget {
   const CustomerOperationsScreen({super.key});
 
   @override
-  State<CustomerOperationsScreen> createState() => _CustomerOperationsScreenState();
+  State<CustomerOperationsScreen> createState() =>
+      _CustomerOperationsScreenState();
 }
 
-class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> with LicenseCheckerMixin {
+class _CustomerOperationsScreenState extends State<CustomerOperationsScreen>
+    with LicenseCheckerMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,7 +55,8 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> wit
                           Expanded(
                             child: Consumer<BusinessProvider>(
                               builder: (context, businessProvider, child) {
-                                if (businessProvider.selectedBusinessId != null) {
+                                if (businessProvider.selectedBusinessId !=
+                                    null) {
                                   return _CustomerList(
                                     businessProvider.selectedBusinessId!,
                                   );
@@ -65,14 +68,20 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> wit
                                         Icon(
                                           Icons.business_outlined,
                                           size: 64,
-                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.4),
                                         ),
                                         const SizedBox(height: 16),
                                         Text(
                                           'No business selected',
                                           style: TextStyle(
                                             fontSize: 18,
-                                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.7),
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -90,10 +99,13 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> wit
                         bottom: 16,
                         child: AnimatedAddButton(
                           onPressed: () async {
-                            final currentCount = await DatabaseHelper.instance.getCustomerCount(
-                              int.parse(Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId!)
-                            );
-                            if (!await checkWithinLimit(context, 'max_customers', currentCount)) {
+                            final currentCount = await DatabaseHelper.instance
+                                .getCustomerCount(int.parse(
+                                    Provider.of<BusinessProvider>(context,
+                                            listen: false)
+                                        .selectedBusinessId!));
+                            if (!await checkWithinLimit(
+                                context, 'max_customers', currentCount)) {
                               return;
                             }
                             if (!mounted) return;
@@ -119,8 +131,14 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> wit
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Theme.of(context).colorScheme.outline.withOpacity(0.1),
-                          Theme.of(context).colorScheme.outline.withOpacity(0.05),
+                          Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.1),
+                          Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.05),
                         ],
                       ),
                     ),
@@ -146,7 +164,10 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> wit
                                 Icon(
                                   Icons.people_outline_sharp,
                                   size: 72,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.4),
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
@@ -154,7 +175,10 @@ class _CustomerOperationsScreenState extends State<CustomerOperationsScreen> wit
                                   style: TextStyle(
                                     fontWeight: FontWeight.w500,
                                     fontSize: 18,
-                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.7),
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -183,7 +207,8 @@ class _CustomerList extends StatefulWidget {
   State<_CustomerList> createState() => __CustomerListState();
 }
 
-class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin {
+class __CustomerListState extends State<_CustomerList>
+    with LicenseCheckerMixin {
   List<Customer> _customers = [];
   List<Customer> _filteredCustomers = [];
   late BusinessProvider _businessProvider;
@@ -249,7 +274,7 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
       // Calculate balances before updating state
       if (mounted) {
         await _businessProvider.calculateBalances();
-        
+
         setState(() {
           _customers = customers;
           _filteredCustomers = customers;
@@ -273,7 +298,8 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
           child: Container(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
               boxShadow: [
                 BoxShadow(
                   color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
@@ -296,7 +322,8 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
@@ -313,14 +340,20 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                               Icon(
                                 Icons.person_search,
                                 size: 64,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.4),
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'No customers found',
                                 style: TextStyle(
                                   fontSize: 18,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.7),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -332,10 +365,11 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                           padding: const EdgeInsets.only(bottom: 80),
                           itemBuilder: (context, index) {
                             final customer = _filteredCustomers[index];
-                            final isSelected = Provider.of<BusinessProvider>(context)
-                                    .selectedCustomer
-                                    ?.id ==
-                                customer.id;
+                            final isSelected =
+                                Provider.of<BusinessProvider>(context)
+                                        .selectedCustomer
+                                        ?.id ==
+                                    customer.id;
 
                             return Card(
                               margin: const EdgeInsets.symmetric(
@@ -344,14 +378,22 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                               ),
                               elevation: isSelected ? 2 : 0,
                               color: isSelected
-                                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
                                   : Theme.of(context).colorScheme.surface,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
                                   color: isSelected
-                                      ? Theme.of(context).colorScheme.outline.withOpacity(0.2)
-                                      : Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withOpacity(0.2)
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withOpacity(0.1),
                                 ),
                               ),
                               child: ListTile(
@@ -361,14 +403,18 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                                 ),
                                 title: Text(
                                   customer.name,
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                  style:
+                                      Theme.of(context).textTheme.titleMedium,
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       NumberFormat.currency(
-                                        symbol: Provider.of<CurrencyProvider>(context, listen: false).currencySymbol,
+                                        symbol: Provider.of<CurrencyProvider>(
+                                                context,
+                                                listen: false)
+                                            .currencySymbol,
                                         locale: 'en_IN',
                                         decimalDigits: 2,
                                       ).format(customer.balance),
@@ -381,28 +427,41 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                                     if (customer.lastTransactionDate != null)
                                       Text(
                                         'Last Transaction: ${DateFormat('d MMMM y').format(customer.lastTransactionDate!)}',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.7),
+                                            ),
                                       ),
                                   ],
                                 ),
                                 trailing: Icon(
                                   Icons.chevron_right,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.4),
                                 ),
                                 onTap: () async {
-                                  Provider.of<BusinessProvider>(context, listen: false)
+                                  Provider.of<BusinessProvider>(context,
+                                          listen: false)
                                       .setSelectedCustomer(customer);
-                                  
-                                  final screenWidth = MediaQuery.of(context).size.width;
+
+                                  final screenWidth =
+                                      MediaQuery.of(context).size.width;
                                   if (screenWidth < 600) {
                                     // For small screens, navigate to full screen
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => TransactionDetailsScreen(
-                                          businessId: int.parse(widget.businessId),
+                                        builder: (context) =>
+                                            TransactionDetailsScreen(
+                                          businessId:
+                                              int.parse(widget.businessId),
                                           customerId: customer.id,
                                           isSupplier: false,
                                         ),
@@ -410,7 +469,8 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                                     );
                                   }
                                   // Refresh transactions for the selected customer
-                                  await Provider.of<BusinessProvider>(context, listen: false)
+                                  await Provider.of<BusinessProvider>(context,
+                                          listen: false)
                                       .refreshTransactions(customer.id);
                                 },
                               ),
@@ -429,8 +489,11 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
   Widget _buildDashboard() {
     return Consumer<BusinessProvider>(
       builder: (context, businessProvider, child) {
-        final totalBalance = businessProvider.customerReceivableBalance - businessProvider.customerPayableBalance;
-        final currencySymbol = Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+        final totalBalance = businessProvider.customerReceivableBalance -
+            businessProvider.customerPayableBalance;
+        final currencySymbol =
+            Provider.of<CurrencyProvider>(context, listen: false)
+                .currencySymbol;
         final numberFormat = NumberFormat.currency(
           symbol: currencySymbol,
           locale: 'en_IN',
@@ -447,7 +510,8 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                   Expanded(
                     child: _buildDashboardItem(
                       'Receivable Balance',
-                      numberFormat.format(businessProvider.customerReceivableBalance.abs()),
+                      numberFormat.format(
+                          businessProvider.customerReceivableBalance.abs()),
                       Icons.account_balance_wallet_outlined,
                       Colors.blue,
                     ),
@@ -456,7 +520,8 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
                   Expanded(
                     child: _buildDashboardItem(
                       'Payable Balance',
-                      numberFormat.format(businessProvider.customerPayableBalance.abs()),
+                      numberFormat.format(
+                          businessProvider.customerPayableBalance.abs()),
                       Icons.payments_outlined,
                       Colors.orange,
                     ),
@@ -479,7 +544,8 @@ class __CustomerListState extends State<_CustomerList> with LicenseCheckerMixin 
     );
   }
 
-  Widget _buildDashboardItem(String title, String value, IconData icon, Color color) {
+  Widget _buildDashboardItem(
+      String title, String value, IconData icon, Color color) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 160),
       decoration: BoxDecoration(

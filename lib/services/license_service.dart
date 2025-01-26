@@ -1,5 +1,6 @@
 // license_service.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';  // Add this import for debugPrint
 import 'package:crypto/crypto.dart';
 import '../database/database_helper.dart';
 import '../models/license_model.dart';
@@ -50,26 +51,26 @@ class LicenseService {
         throw Exception('Invalid license key format');
       }
 
-      // Validate that key prefix matches license type
-      final prefix = licenseKey.split('-')[0];
-      final expectedType = switch (prefix) {
+      // Extract the license type from the key
+      final keyPrefix = licenseKey.split('-')[0];
+      final keyType = switch (keyPrefix) {
         'DEMO' => LicenseType.demo,
         'PRO' => LicenseType.professional,
         'ENT' => LicenseType.enterprise,
         _ => throw Exception('Invalid license key prefix'),
       };
 
-      if (type != expectedType) {
-        throw Exception('License key type does not match selected plan');
+      // Compare the key type with the selected type
+      if (keyType != type) {
+        throw Exception('License key prefix (${keyPrefix}) does not match selected plan (${type.toString().split('.').last})');
       }
 
       final features = License.getDefaultFeatures(type);
       final activationDate = DateTime.now();
       
       // Calculate expiry date based on license type
-      DateTime? expiryDate;
       final expiryDays = features['expiry_days'] as int? ?? 30; // Default to 30 days
-      expiryDate = activationDate.add(Duration(days: expiryDays));
+      final expiryDate = activationDate.add(Duration(days: expiryDays));
 
       final license = License(
         licenseKey: licenseKey,
@@ -81,11 +82,10 @@ class LicenseService {
       );
 
       await DatabaseHelper.instance.saveLicense(license);
-      await scheduleExpiryNotifications(license);
       return license;
     } catch (e) {
-      print('License activation error: $e');
-      return null;
+      debugPrint('License activation error: $e');
+      rethrow; // Rethrow to let the provider handle the error
     }
   }
 

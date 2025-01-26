@@ -497,7 +497,7 @@ class GoogleDriveService {
 
       // Read file metadata
       final fileName = file.path.split(Platform.pathSeparator).last;
-      final mimeType = 'application/octet-stream';
+      const mimeType = 'application/octet-stream';
       final fileSize = await file.length();
 
       print('Uploading file: $fileName ($fileSize bytes)');

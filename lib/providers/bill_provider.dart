@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../database/database_helper.dart';
 import '../models/bill_model.dart';
-import '../models/business_model.dart';
 import '../models/customer_model.dart';
 import '../models/inventory_item_model.dart';
 import '../models/transaction_model.dart'; // Import transaction model

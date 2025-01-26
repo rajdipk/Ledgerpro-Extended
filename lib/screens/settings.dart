@@ -12,8 +12,6 @@ import 'dart:math' as math;
 import '../mannuals/user_manual_screen.dart';
 import '../providers/business_provider.dart';
 import '../database/database_helper.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart'; // Import the intl package
 import '../services/google_drive_service.dart';
 import '../services/backup_service.dart';
@@ -1035,109 +1033,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                         ),
                       ),
-                      if (selectedBusiness != null) ...[
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Backup & Restore',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                      ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Backup & Restore',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const SizedBox(height: 16),
+                              ),
+                              const SizedBox(height: 16),
+                              ListTile(
+                                leading: const Icon(Icons.cloud_download),
+                                title: const Text('Local Backup'),
+                                subtitle: const Text(
+                                  'Save all your business data to a local file'
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.arrow_forward_ios),
+                                  onPressed: _backupData,
+                                ),
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.cloud_upload),
+                                title: const Text('Restore from Local Backup'),
+                                subtitle: const Text(
+                                  'Restore your business data from a local backup file'
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.arrow_forward_ios),
+                                  onPressed: _restoreData,
+                                ),
+                              ),
+                              const Divider(),
+                              ListTile(
+                                leading: Icon(
+                                  _isGoogleSignedIn ? Icons.cloud_done : Icons.cloud_off,
+                                  color: _isGoogleSignedIn ? Colors.green : Colors.grey,
+                                ),
+                                title: Text(_isGoogleSignedIn 
+                                  ? 'Connected to Google Drive' 
+                                  : 'Connect to Google Drive'
+                                ),
+                                trailing: Switch(
+                                  value: _isGoogleSignedIn,
+                                  onChanged: (value) => _toggleGoogleSignIn(),
+                                ),
+                              ),
+                              if (_isGoogleSignedIn) ...[
                                 ListTile(
-                                  leading: const Icon(Icons.cloud_download),
-                                  title: const Text('Local Backup'),
-                                  subtitle: const Text(
-                                    'Save all your business data to a local file'
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.arrow_forward_ios),
-                                    onPressed: _backupData,
+                                  leading: const Icon(Icons.backup),
+                                  title: const Text('Auto Backup'),
+                                  subtitle: const Text('Automatically backup to Google Drive'),
+                                  trailing: Switch(
+                                    value: _isAutoBackupEnabled,
+                                    onChanged: _toggleAutoBackup,
                                   ),
                                 ),
+                                if (_isAutoBackupEnabled)
+                                  ListTile(
+                                    leading: const Icon(Icons.timer),
+                                    title: const Text('Backup Interval'),
+                                    subtitle: Text('Every $_backupInterval hours'),
+                                    trailing: DropdownButton<int>(
+                                      value: _backupInterval,
+                                      items: [6, 12, 24, 48, 72].map((hours) {
+                                        return DropdownMenuItem(
+                                          value: hours,
+                                          child: Text('$hours hrs'),
+                                        );
+                                      }).toList(),
+                                      onChanged: _updateBackupInterval,
+                                    ),
+                                  ),
                                 ListTile(
                                   leading: const Icon(Icons.cloud_upload),
-                                  title: const Text('Restore from Local Backup'),
-                                  subtitle: const Text(
-                                    'Restore your business data from a local backup file'
-                                  ),
+                                  title: const Text('Backup to Google Drive'),
+                                  subtitle: const Text('Upload current data to Google Drive'),
                                   trailing: IconButton(
                                     icon: const Icon(Icons.arrow_forward_ios),
-                                    onPressed: _restoreData,
+                                    onPressed: _backupToGoogleDrive,
                                   ),
                                 ),
-                                const Divider(),
                                 ListTile(
-                                  leading: Icon(
-                                    _isGoogleSignedIn ? Icons.cloud_done : Icons.cloud_off,
-                                    color: _isGoogleSignedIn ? Colors.green : Colors.grey,
-                                  ),
-                                  title: Text(_isGoogleSignedIn 
-                                    ? 'Connected to Google Drive' 
-                                    : 'Connect to Google Drive'
-                                  ),
-                                  trailing: Switch(
-                                    value: _isGoogleSignedIn,
-                                    onChanged: (value) => _toggleGoogleSignIn(),
+                                  leading: const Icon(Icons.cloud_download),
+                                  title: const Text('Restore from Google Drive'),
+                                  subtitle: const Text('Download latest backup from Google Drive'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.arrow_forward_ios),
+                                    onPressed: _restoreFromGoogleDrive,
                                   ),
                                 ),
-                                if (_isGoogleSignedIn) ...[
-                                  ListTile(
-                                    leading: const Icon(Icons.backup),
-                                    title: const Text('Auto Backup'),
-                                    subtitle: const Text('Automatically backup to Google Drive'),
-                                    trailing: Switch(
-                                      value: _isAutoBackupEnabled,
-                                      onChanged: _toggleAutoBackup,
-                                    ),
-                                  ),
-                                  if (_isAutoBackupEnabled)
-                                    ListTile(
-                                      leading: const Icon(Icons.timer),
-                                      title: const Text('Backup Interval'),
-                                      subtitle: Text('Every $_backupInterval hours'),
-                                      trailing: DropdownButton<int>(
-                                        value: _backupInterval,
-                                        items: [6, 12, 24, 48, 72].map((hours) {
-                                          return DropdownMenuItem(
-                                            value: hours,
-                                            child: Text('$hours hrs'),
-                                          );
-                                        }).toList(),
-                                        onChanged: _updateBackupInterval,
-                                      ),
-                                    ),
-                                  ListTile(
-                                    leading: const Icon(Icons.cloud_upload),
-                                    title: const Text('Backup to Google Drive'),
-                                    subtitle: const Text('Upload current data to Google Drive'),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.arrow_forward_ios),
-                                      onPressed: _backupToGoogleDrive,
-                                    ),
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.cloud_download),
-                                    title: const Text('Restore from Google Drive'),
-                                    subtitle: const Text('Download latest backup from Google Drive'),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.arrow_forward_ios),
-                                      onPressed: _restoreFromGoogleDrive,
-                                    ),
-                                  ),
-                                ],
                               ],
-                            ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                      ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     ],
                   );
                 },

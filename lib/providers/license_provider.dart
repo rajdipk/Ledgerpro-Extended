@@ -3,186 +3,115 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../models/license_model.dart';
 import '../services/license_service.dart';
-import '../services/storage_service.dart';
+import '../database/database_helper.dart';
 
 class LicenseProvider with ChangeNotifier {
   License? _currentLicense;
-  bool _isLoading = false;
   String? _error;
-  String? _licenseKey;
-  LicenseType _licenseType = LicenseType.demo;
-  String? _customerId;
-  String? _customerEmail;
-  DateTime? _expiryDate;
-  bool _isActive = false;
 
+  String? get customerId => _currentLicense?.id?.toString();
+  String? get customerEmail => _currentLicense?.customerEmail;
   License? get currentLicense => _currentLicense;
-  bool get isLoading => _isLoading;
   String? get error => _error;
-  String? get licenseKey => _licenseKey;
-  LicenseType get licenseType => _licenseType;
-  String? get customerId => _customerId;
-  String? get customerEmail => _customerEmail;
-  DateTime? get expiryDate => _expiryDate;
-  bool get isActive => _isActive;
-  
-  // Initialize license state
-  Future<void> initializeLicense() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  bool get isLicensed => _currentLicense != null && !_currentLicense!.isExpired();
 
+  Future<void> loadLicense() async {
     try {
-      final status = await LicenseService.instance.getLicenseStatus();
-      if (status['status'] == 'active') {
-        // Load current license
-        _currentLicense = await LicenseService.instance
-            .activateLicense(
-              status['license_key'], 
-              '', // Email not needed for existing license
-              LicenseType.values.firstWhere(
-                (e) => e.toString().split('.').last == status['type']
-              )
-            );
-      }
+      _currentLicense = await DatabaseHelper.instance.getCurrentLicense();
+      notifyListeners();
     } catch (e) {
-      _error = 'Failed to initialize license: $e';
-    } finally {
-      _isLoading = false;
+      debugPrint('Error loading license: $e');
+      _error = 'Failed to load license';
       notifyListeners();
     }
   }
 
-  // Activate a new license
-  Future<bool> activateLicense(String licenseKey, String email, LicenseType type) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
+  Future<void> initializeLicense() async {
     try {
-      final license = await LicenseService.instance
-          .activateLicense(licenseKey, email, type);
+      await loadLicense();
+      if (_currentLicense != null) {
+        await LicenseService.instance.checkAndNotifyExpiry();
+      }
+    } catch (e) {
+      debugPrint('Error initializing license: $e');
+      _error = 'Failed to initialize license';
+      notifyListeners();
+    }
+  }
+
+  Future<bool> activateLicense(String licenseKey, String email, LicenseType type) async {
+    try {
+      _error = null; // Reset any previous errors
       
-      if (license != null) {
-        _currentLicense = license;
-        _licenseKey = licenseKey;
-        _licenseType = type;
-        _customerEmail = email;
-        _customerId = await StorageService.instance.getValue('customerId');
-        _isActive = true;
-        _expiryDate = license.expiryDate;
-        
-        // Save to storage
-        await StorageService.instance.saveValue('licenseKey', licenseKey);
-        await StorageService.instance.saveValue('licenseType', type.toString());
-        await StorageService.instance.saveValue('customerEmail', email);
-        if (_expiryDate != null) {
-          await StorageService.instance.saveValue('expiryDate', _expiryDate!.toIso8601String());
-        }
-        
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      } else {
-        _error = 'Failed to activate license: Invalid response from server';
-        _isLoading = false;
+      // Validate inputs
+      if (licenseKey.isEmpty || email.isEmpty) {
+        _error = 'License key and email are required';
         notifyListeners();
         return false;
       }
+
+      // Activate license using LicenseService
+      final license = await LicenseService.instance.activateLicense(
+        licenseKey.trim(),
+        email.trim(),
+        type,
+      );
+
+      if (license == null) {
+        _error = 'Failed to activate license';
+        notifyListeners();
+        return false;
+      }
+
+      // Store the activated license
+      _currentLicense = license;
+      notifyListeners();
+      return true;
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
+      debugPrint('License activation error: $e');
+      _error = 'Failed to activate license: ${e.toString()}';
       notifyListeners();
       return false;
     }
   }
 
-  // Check if a feature is available
-  Future<bool> isFeatureAvailable(String featureName) async {
+  Future<void> deactivateLicense() async {
     try {
-      return await LicenseService.instance.isFeatureAvailable(featureName);
+      await DatabaseHelper.instance.deleteLicense();
+      _currentLicense = null;
+      _error = null;
+      notifyListeners();
     } catch (e) {
-      _error = 'Failed to check feature availability: $e';
-      return false;
+      debugPrint('Error deactivating license: $e');
+      _error = 'Failed to deactivate license';
+      notifyListeners();
     }
   }
 
-  // Check if within limits
-  Future<bool> isWithinLimit(String limitName, int currentCount) async {
-    try {
-      return await LicenseService.instance.isWithinLimit(limitName, currentCount);
-    } catch (e) {
-      _error = 'Failed to check limit: $e';
-      return false;
-    }
-  }
-
-  // Get current license status
   Future<Map<String, dynamic>> getLicenseStatus() async {
     try {
       return await LicenseService.instance.getLicenseStatus();
     } catch (e) {
-      _error = 'Failed to get license status: $e';
+      debugPrint('Error getting license status: $e');
       return {
         'status': 'error',
-        'error': e.toString(),
+        'message': e.toString(),
       };
     }
   }
 
-  // Deactivate current license
-  Future<void> deactivateLicense() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      await LicenseService.instance.deactivateLicense();
-      _currentLicense = null;
-      _licenseKey = null;
-      _licenseType = LicenseType.demo;
-      _customerEmail = null;
-      _isActive = false;
-      _expiryDate = null;
-      
-      // Clear from storage
-      await StorageService.instance.removeValue('licenseKey');
-      await StorageService.instance.removeValue('licenseType');
-      await StorageService.instance.removeValue('customerEmail');
-      await StorageService.instance.removeValue('expiryDate');
-    } catch (e) {
-      _error = 'Failed to deactivate license: $e';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+  Future<bool> isFeatureAvailable(String featureName) async {
+    if (_currentLicense == null) return false;
+    if (_currentLicense!.isExpired()) return false;
+    return _currentLicense!.hasFeature(featureName);
   }
 
-  // Clear any error
-  void clearError() {
-    _error = null;
-    notifyListeners();
-  }
-
-  Future<void> loadLicenseData() async {
-    _licenseKey = await StorageService.instance.getValue('licenseKey');
-    final typeStr = await StorageService.instance.getValue('licenseType');
-    _customerEmail = await StorageService.instance.getValue('customerEmail');
-    _customerId = await StorageService.instance.getValue('customerId');
-    final expiryStr = await StorageService.instance.getValue('expiryDate');
+  Future<bool> isWithinLimit(String limitName, int currentCount) async {
+    if (_currentLicense == null) return false;
+    if (_currentLicense!.isExpired()) return false;
     
-    if (typeStr != null) {
-      _licenseType = LicenseType.values.firstWhere(
-        (t) => t.toString() == typeStr,
-        orElse: () => LicenseType.demo,
-      );
-    }
-    
-    if (expiryStr != null) {
-      _expiryDate = DateTime.parse(expiryStr);
-      _isActive = _expiryDate!.isAfter(DateTime.now());
-    }
-    
-    notifyListeners();
+    final limit = _currentLicense!.getFeatureLimit(limitName);
+    if (limit == null || limit < 0) return true; // No limit or unlimited
+    return currentCount < limit;
   }
 }

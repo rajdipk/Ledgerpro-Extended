@@ -119,6 +119,7 @@ class BillListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(symbol: '₹');
+    final isNarrowScreen = MediaQuery.of(context).size.width < 600;
 
     return Card(
       elevation: 2,
@@ -128,35 +129,46 @@ class BillListItem extends StatelessWidget {
           HomeScreen.of(context)
               .switchContent(BillDetailsScreen(bill: bill), '/bill-details');
         },
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Bill #${bill.id}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+        title: isNarrowScreen
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Bill #${bill.id}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      _buildStatusBadge(),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    bill.customer.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Bill #${bill.id}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(bill.customer.name),
+                  ),
+                  _buildStatusBadge(),
+                ],
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: bill.status == 'paid'
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                bill.status.toUpperCase(),
-                style: TextStyle(
-                  color: bill.status == 'paid' ? Colors.green : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -234,6 +246,26 @@ class BillListItem extends StatelessWidget {
           ],
         ),
         isThreeLine: true,
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bill.status == 'paid'
+            ? Colors.green.withOpacity(0.1)
+            : Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        bill.status.toUpperCase(),
+        style: TextStyle(
+          color: bill.status == 'paid' ? Colors.green : Colors.orange,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
       ),
     );
   }

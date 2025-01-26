@@ -71,38 +71,11 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
     setState(() => _isActivating = true);
 
     try {
-      final licenseKey = _licenseKeyController.text.trim();
-      final email = _emailController.text.trim();
-      
-      // Determine license type from key prefix
-      LicenseType type;
-      if (licenseKey.startsWith('DEMO-')) {
-        type = LicenseType.demo;
-      } else if (licenseKey.startsWith('PRO-')) {
-        type = LicenseType.professional;
-      } else if (licenseKey.startsWith('ENT-')) {
-        type = LicenseType.enterprise;
-      } else {
-        setState(() => _isActivating = false);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid license key format'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Save license details
-      await StorageService.instance.saveValue('license_email', email);
-      await StorageService.instance.saveValue('license_key', licenseKey);
-
       final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
       final success = await licenseProvider.activateLicense(
-        licenseKey,
-        email,
-        type,
+        _licenseKeyController.text.trim(),
+        _emailController.text.trim(),
+        _selectedType,
       );
 
       if (!mounted) return;
@@ -114,7 +87,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -424,8 +397,19 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
             const SizedBox(height: 16),
             TextFormField(
               controller: _licenseKeyController,
+              onChanged: (value) {
+                // Auto-select the plan based on key prefix
+                if (value.startsWith('DEMO-')) {
+                  setState(() => _selectedType = LicenseType.demo);
+                } else if (value.startsWith('PRO-')) {
+                  setState(() => _selectedType = LicenseType.professional);
+                } else if (value.startsWith('ENT-')) {
+                  setState(() => _selectedType = LicenseType.enterprise);
+                }
+              },
               decoration: InputDecoration(
                 labelText: 'License Key',
+                hintText: 'Example: PRO-1234-5678-9012',
                 prefixIcon: const Icon(Icons.vpn_key_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -441,11 +425,25 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
                 if (value == null || value.isEmpty) {
                   return 'Please enter your license key';
                 }
-                // Format should match the demo keys: DEMO-1234-5678-9012
+                
+                // Check if key prefix matches selected type
+                final prefix = value.split('-').first;
+                final expectedPrefix = switch (_selectedType) {
+                  LicenseType.demo => 'DEMO',
+                  LicenseType.professional => 'PRO',
+                  LicenseType.enterprise => 'ENT',
+                };
+                
+                if (prefix != expectedPrefix) {
+                  return 'Key must start with $expectedPrefix for ${_selectedType.toString().split('.').last} license';
+                }
+
+                // Validate full format
                 final validKeyFormat = RegExp(r'^(DEMO|PRO|ENT)-[0-9]{4}-[0-9]{4}-[0-9]{4}$');
                 if (!validKeyFormat.hasMatch(value)) {
-                  return 'Invalid license key format. Example: PRO-1234-5678-9012';
+                  return 'Invalid license key format';
                 }
+
                 return null;
               },
             ),

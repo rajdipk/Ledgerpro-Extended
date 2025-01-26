@@ -2,9 +2,101 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/license_provider.dart';
 import '../../models/license_model.dart';
+import '../../services/storage_service.dart';
+import '../license/license_activation_screen.dart';
+import '../../database/database_helper.dart';
 
-class AccountDetailsScreen extends StatelessWidget {
+class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
+
+  @override
+  State<AccountDetailsScreen> createState() => _AccountDetailsScreenState();
+}
+
+class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
+  Map<String, int> _usageStats = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsageStats();
+  }
+
+  Future<void> _loadUsageStats() async {
+    try {
+      final db = DatabaseHelper.instance;
+      final stats = await Future.wait([
+        db.getCustomerCount(),
+        db.getInventoryCount(),
+        db.getMonthlyTransactionCount(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _usageStats = {
+            'customers': stats[0],
+            'inventory': stats[1],
+            'transactions': stats[2],
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading usage stats: $e');
+      if (mounted) {
+        setState(() {
+          _usageStats = {
+            'customers': 0,
+            'inventory': 0,
+            'transactions': 0,
+          };
+        });
+      }
+    }
+  }
+
+  Future<void> _handleActivateLicense() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LicenseActivationScreen()),
+    );
+
+    if (result == true) {
+      // License was activated successfully
+      setState(() {
+        _loadUsageStats();
+      });
+    }
+  }
+
+  Future<void> _handleDeactivateLicense() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Deactivate License?'),
+        content: const Text('This will remove your current license. Are you sure?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
+      await licenseProvider.deactivateLicense();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('License deactivated successfully')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,22 +109,76 @@ class AccountDetailsScreen extends StatelessWidget {
             title: const Text('Account Details'),
             backgroundColor: Colors.teal,
             foregroundColor: Colors.white,
+            actions: [
+              if (license != null)
+                IconButton(
+                  icon: const Icon(Icons.logout),
+                  onPressed: _handleDeactivateLicense,
+                  tooltip: 'Deactivate License',
+                ),
+            ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildLicenseCard(license),
-                const SizedBox(height: 24),
-                _buildUsageSection(license),
-                const SizedBox(height: 24),
-                _buildFeaturesList(license),
-              ],
+          body: RefreshIndicator(
+            onRefresh: _loadUsageStats,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (license == null)
+                    _buildActivationCard()
+                  else
+                    _buildLicenseCard(license),
+                  const SizedBox(height: 24),
+                  if (license != null) ...[
+                    _buildUsageSection(license),
+                    const SizedBox(height: 24),
+                    _buildFeaturesList(license),
+                  ],
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActivationCard() {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'No Active License',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal[700],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Activate a license to unlock premium features and increase usage limits.',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _handleActivateLicense,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Activate License'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -81,9 +227,7 @@ class AccountDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUsageSection(License? license) {
-    if (license == null) return const SizedBox();
-
+  Widget _buildUsageSection(License license) {
     return Card(
       elevation: 4,
       child: Padding(
@@ -104,19 +248,19 @@ class AccountDetailsScreen extends StatelessWidget {
             _buildUsageBar(
               'Customers', 
               license.getFeatureLimit('customer_limit') ?? 0,
-              75, // TODO: Get actual count
+              _usageStats['customers'] ?? 0,
             ),
             const SizedBox(height: 16),
             _buildUsageBar(
               'Inventory Items',
               license.getFeatureLimit('inventory_limit') ?? 0,
-              120, // TODO: Get actual count
+              _usageStats['inventory'] ?? 0,
             ),
             const SizedBox(height: 16),
             _buildUsageBar(
               'Monthly Transactions',
               license.getFeatureLimit('monthly_transaction_limit') ?? 0,
-              450, // TODO: Get actual count
+              _usageStats['transactions'] ?? 0,
             ),
           ],
         ),

@@ -17,12 +17,23 @@ router.use(cors(corsOptions));
 // Add OPTIONS handling for preflight requests
 router.options('*', cors(corsOptions));
 
+// Add error handling wrapper
+const asyncHandler = fn => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // Apply admin auth middleware to all admin routes
 router.use(adminAuth);
 
-router.get('/dashboard', adminController.getDashboard);
-router.get('/customers', adminController.getCustomers);
-router.post('/customers', adminController.createCustomer);
-router.post('/update-pricing', adminController.updatePricing);
+// Wrap routes with error handler
+router.get('/dashboard', asyncHandler(adminController.getDashboard));
+router.get('/customers', asyncHandler(adminController.getCustomers));
+router.post('/customers', asyncHandler(adminController.createCustomer));
+router.post('/update-pricing', asyncHandler(adminController.updatePricing));
+
+// Add health check endpoint
+router.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 module.exports = router;

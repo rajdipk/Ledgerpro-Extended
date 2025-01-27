@@ -31,24 +31,35 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Add request logging before CORS
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} [${req.method}] ${req.url}`);
+    console.log('Headers:', req.headers);
+    next();
+});
+
 // Update CORS options
 const corsOptions = {
     origin: function (origin, callback) {
         const allowedOrigins = [
-            'http://localhost:3000',
+            'http://localhost:10000',
             'http://localhost:5000',
             'http://127.0.0.1:5500',
-            'https://ledgerpro-extended.onrender.com'
+            'https://ledgerpro-extended.onrender.com',
+            'https://rajdipk.github.io'
         ];
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            console.log('Blocked by CORS:', origin);
+            callback(null, false);
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
@@ -92,13 +103,13 @@ app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    if (res.headersSent) {
-        return next(err);
-    }
+    console.error('Error occurred:', err);
     res.status(err.status || 500).json({
         success: false,
-        error: err.message || 'Something went wrong!'
+        error: process.env.NODE_ENV === 'production' 
+            ? 'Internal server error' 
+            : err.message,
+        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
 });
 

@@ -207,7 +207,7 @@
     <script>
         // Update API configuration
         const API_CONFIG = {
-            BASE_URL: 'https://ledgerpro-extended.onrender.com', // Always use HTTPS in production
+            BASE_URL: 'https://ledgerpro-extended.onrender.com',
             ADMIN_TOKEN: '3562'
         };
 
@@ -222,13 +222,15 @@
                 }
             };
 
-            // Remove credentials option as it causes CORS issues
-            delete defaultOptions.credentials;
-
             for (let attempt = 1; attempt <= retries; attempt++) {
                 try {
                     const url = `${API_CONFIG.BASE_URL}${endpoint}`;
                     console.log(`API call attempt ${attempt} to ${url}`);
+                    
+                    // Make a preflight request first
+                    if (options.method !== 'GET') {
+                        await fetch(url, { method: 'OPTIONS' });
+                    }
 
                     const response = await fetch(url, {
                         ...defaultOptions,
@@ -240,14 +242,17 @@
                     });
 
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        const errorData = await response.json().catch(() => ({
+                            error: `HTTP error! status: ${response.status}`
+                        }));
+                        throw new Error(errorData.error || `Server error: ${response.status}`);
                     }
 
                     return await response.json();
                 } catch (error) {
                     console.error(`API call attempt ${attempt} failed:`, error);
                     if (attempt === retries) throw error;
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
                 }
             }
         }

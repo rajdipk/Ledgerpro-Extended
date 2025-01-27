@@ -38,16 +38,18 @@ app.use((req, res, next) => {
     next();
 });
 
-// Update CORS options with more permissive settings for development
+// Update CORS options
 const corsOptions = {
-    origin: true, // Allow all origins in development
-    credentials: true,
+    origin: ['https://rajdipk.github.io', 'https://ledgerpro-extended.onrender.com', 'http://localhost:5000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
     exposedHeaders: ['x-admin-token'],
-    optionsSuccessStatus: 200
+    credentials: false, // Set to false since we're not using cookies
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 };
 
+// Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Add headers middleware

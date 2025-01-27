@@ -1,11 +1,19 @@
 const Customer = require('../models/customer');
 const razorpayService = require('../services/razorpayService');
+const mongoose = require('mongoose');
 
 exports.getDashboard = async (req, res) => {
     try {
-        const customerCount = await Customer.countDocuments();
-        const activeCustomers = await Customer.countDocuments({ 'license.status': 'active' });
-        const paidCustomers = await Customer.countDocuments({ 'license.type': 'professional' });
+        // Verify database connection
+        if (!mongoose.connection.readyState) {
+            throw new Error('Database connection not established');
+        }
+
+        const [customerCount, activeCustomers, paidCustomers] = await Promise.all([
+            Customer.countDocuments(),
+            Customer.countDocuments({ 'license.status': 'active' }),
+            Customer.countDocuments({ 'license.type': { $in: ['professional', 'enterprise'] } })
+        ]);
         
         const pricing = {
             professional: razorpayService.prices.professional,
@@ -25,7 +33,11 @@ exports.getDashboard = async (req, res) => {
         });
     } catch (error) {
         console.error('Admin dashboard error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ 
+            success: false, 
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

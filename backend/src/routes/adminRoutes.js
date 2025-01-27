@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const auth = require('../middleware/auth');
+const adminAuth = require('../middleware/adminAuth');
 const cors = require('cors');
 
 // Enable CORS for admin routes
@@ -17,8 +17,8 @@ router.use(cors(corsOptions));
 // Add OPTIONS handling for preflight requests
 router.options('*', cors(corsOptions));
 
-// Protect all admin routes with authentication
-router.use(auth.requireAdmin);
+// Apply admin auth middleware to all admin routes
+router.use(adminAuth);
 
 router.get('/dashboard', adminController.getDashboard);
 router.get('/customers', adminController.getCustomers);

@@ -9,7 +9,6 @@ const path = require('path');
 // Import routes
 const customerRoutes = require('./routes/customerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const corsOptions = require('./middleware/cors');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,10 +27,31 @@ wss.on('connection', (ws) => {
 
 // Middleware
 app.use(helmet());
-app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Update CORS options
+const corsOptions = {
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://localhost:5000',
+            'http://127.0.0.1:5500',
+            'https://ledgerpro-extended.onrender.com'
+        ];
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token']
+};
+
+app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
@@ -49,6 +69,17 @@ app.use((req, res, next) => {
         body: req.body,
         headers: req.headers
     });
+    next();
+});
+
+// Add mongoose connection status check middleware
+app.use((req, res, next) => {
+    if (!mongoose.connection.readyState) {
+        return res.status(503).json({
+            success: false,
+            error: 'Database connection not established'
+        });
+    }
     next();
 });
 

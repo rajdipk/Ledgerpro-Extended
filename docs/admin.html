@@ -207,17 +207,14 @@
     <script>
         // Update API configuration
         const API_CONFIG = {
-            BASE_URL: window.location.hostname === 'localhost' 
-                ? 'http://localhost:10000'  // Updated port
-                : 'https://ledgerpro-extended.onrender.com',
+            BASE_URL: 'https://ledgerpro-extended.onrender.com', // Always use HTTPS in production
             ADMIN_TOKEN: '3562'
         };
 
-        // Enhanced API call function with better error handling
+        // Enhanced API call function
         async function apiCall(endpoint, options = {}, retries = 3) {
             const defaultOptions = {
                 mode: 'cors',
-                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
@@ -225,11 +222,14 @@
                 }
             };
 
+            // Remove credentials option as it causes CORS issues
+            delete defaultOptions.credentials;
+
             for (let attempt = 1; attempt <= retries; attempt++) {
                 try {
                     const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-                    console.log(`Attempting API call to ${url} (attempt ${attempt})`);
-                    
+                    console.log(`API call attempt ${attempt} to ${url}`);
+
                     const response = await fetch(url, {
                         ...defaultOptions,
                         ...options,
@@ -240,24 +240,36 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({
-                            error: `HTTP error! status: ${response.status}`
-                        }));
-                        throw new Error(errorData.error || `Server error: ${response.status}`);
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
-                    const data = await response.json();
-                    console.log(`API call succeeded:`, data);
-                    return data;
+                    return await response.json();
                 } catch (error) {
                     console.error(`API call attempt ${attempt} failed:`, error);
-                    if (attempt === retries) {
-                        throw new Error(`Failed after ${retries} attempts: ${error.message}`);
-                    }
-                    // Exponential backoff
-                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+                    if (attempt === retries) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
                 }
             }
+        }
+
+        // Add connection status indicator
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connectionStatus') || 
+                (() => {
+                    const div = document.createElement('div');
+                    div.id = 'connectionStatus';
+                    div.style.position = 'fixed';
+                    div.style.top = '10px';
+                    div.style.right = '10px';
+                    div.style.padding = '10px';
+                    div.style.borderRadius = '5px';
+                    document.body.appendChild(div);
+                    return div;
+                })();
+
+            statusDiv.style.backgroundColor = status ? '#4CAF50' : '#f44336';
+            statusDiv.style.color = 'white';
+            statusDiv.textContent = message;
         }
 
         // Update loadDashboard function
@@ -366,14 +378,26 @@
         });
 
         // Initialize periodic data refresh
-        function startDataRefresh() {
-            loadDashboard();
-            loadCustomers();
+        async function startDataRefresh() {
+            try {
+                await loadDashboard();
+                await loadCustomers();
+                updateConnectionStatus(true, 'Connected to server');
+            } catch (error) {
+                console.error('Failed to initialize dashboard:', error);
+                updateConnectionStatus(false, 'Connection failed');
+            }
 
             // Refresh data every 30 seconds
-            setInterval(() => {
-                loadDashboard();
-                loadCustomers();
+            setInterval(async () => {
+                try {
+                    await loadDashboard();
+                    await loadCustomers();
+                    updateConnectionStatus(true, 'Connected to server');
+                } catch (error) {
+                    console.error('Refresh failed:', error);
+                    updateConnectionStatus(false, 'Connection lost');
+                }
             }, 30000);
         }
 

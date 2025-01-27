@@ -38,34 +38,17 @@ app.use((req, res, next) => {
     next();
 });
 
-// Update CORS options
+// Update CORS options with more permissive settings for development
 const corsOptions = {
-    origin: function (origin, callback) {
-        const allowedOrigins = [
-            'http://localhost:10000',
-            'http://localhost:5000',
-            'http://127.0.0.1:5500',
-            'https://ledgerpro-extended.onrender.com',
-            'https://rajdipk.github.io'
-        ];
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.log('Blocked by CORS:', origin);
-            callback(null, false);
-        }
-    },
+    origin: true, // Allow all origins in development
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
+    exposedHeaders: ['x-admin-token'],
     optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
 
 // Add headers middleware
 app.use((req, res, next) => {
@@ -94,12 +77,16 @@ app.use((req, res, next) => {
     next();
 });
 
-// Serve static files from docs directory
-app.use(express.static(path.join(__dirname, '../../docs')));
+// Update static file serving
+app.use(express.static(path.join(__dirname, '../../docs'), {
+    setHeaders: (res, path) => {
+        res.set('Access-Control-Allow-Origin', '*');
+    }
+}));
 
-// API Routes
-app.use('/api/customers', customerRoutes);
+// Move API routes before error handlers
 app.use('/api/admin', adminRoutes);
+app.use('/api/customers', customerRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -122,9 +109,9 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Change default port to 10000
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Starting server in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
 
 module.exports = { app, server, wss };

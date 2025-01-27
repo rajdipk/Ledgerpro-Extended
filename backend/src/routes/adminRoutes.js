@@ -22,6 +22,12 @@ const asyncHandler = fn => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// Add basic route logging
+router.use((req, res, next) => {
+    console.log(`Admin route accessed: ${req.method} ${req.path}`);
+    next();
+});
+
 // Apply admin auth middleware to all admin routes
 router.use(adminAuth);
 
@@ -33,7 +39,11 @@ router.post('/update-pricing', asyncHandler(adminController.updatePricing));
 
 // Add health check endpoint
 router.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ 
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
+    });
 });
 
 module.exports = router;

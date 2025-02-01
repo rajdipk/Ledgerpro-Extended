@@ -7,9 +7,12 @@ import '../database/database_helper.dart';
 import '../models/license_model.dart';
 import '../services/notification_service.dart';
 import '../config/api_config.dart';
+import '../services/api_service.dart'; // Add this import
 
 class LicenseService {
   static final LicenseService instance = LicenseService._();
+  final ApiService _apiService = ApiService.instance; // Add this field
+  
   LicenseService._();
 
   // Generate a license key
@@ -234,7 +237,7 @@ class LicenseService {
 
   Future<bool> verifyLicenseWithServer(String licenseKey, String email) async {
     try {
-        final response = await apiService.apiCall(
+        final response = await _apiService.apiCall(
             '/api/admin/verify-license',
             method: 'POST',
             body: {

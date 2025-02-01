@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
+const mongoose = require('mongoose'); // Add mongoose import
 
 // Import routes
 const customerRoutes = require('./routes/customerRoutes');
@@ -25,99 +26,50 @@ wss.on('connection', (ws) => {
     ws.on('error', console.error);
 });
 
-// Middleware
+// Middleware setup
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Add request logging before CORS
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} [${req.method}] ${req.url}`);
-    console.log('Headers:', req.headers);
-    next();
-});
-
-// Update CORS options
+// CORS configuration
 const corsOptions = {
-    origin: '*', // Allow all origins temporarily for testing
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'x-admin-token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
     credentials: false
 };
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Add headers middleware
+// Debug middleware to log all requests
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Credentials', true);
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-admin-token');
+    console.log(`${new Date().toISOString()} [${req.method}] ${req.path}`);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
     next();
 });
 
-// Add better request logging
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} [${req.method}] ${req.path}`, {
-        headers: req.headers,
-        body: req.body,
-        query: req.query
-    });
-    next();
-});
-
-// Add mongoose connection status check middleware
-app.use((req, res, next) => {
-    if (!mongoose.connection.readyState) {
-        return res.status(503).json({
-            success: false,
-            error: 'Database connection not established'
-        });
-    }
-    next();
-});
-
-// Update static file serving
-app.use(express.static(path.join(__dirname, '../../docs'), {
-    setHeaders: (res, path) => {
-        res.set('Access-Control-Allow-Origin', '*');
-    }
-}));
-
-// Move routes registration before error handlers and after CORS
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// Add admin routes first
+// Register routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/customers', customerRoutes);
 
-// Add route debugging
-app.use((req, res, next) => {
-    console.log(`Route accessed: ${req.method} ${req.path}`, {
-        headers: req.headers,
-        body: req.body
-    });
-    next();
-});
-
-// Error handling middleware
+// Error handler
 app.use((err, req, res, next) => {
-    console.error('Error occurred:', err);
+    console.error('Error:', err);
     res.status(err.status || 500).json({
         success: false,
-        error: process.env.NODE_ENV === 'production' 
-            ? 'Internal server error' 
-            : err.message,
-        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        error: err.message || 'Internal server error'
     });
 });
 
-// Handle 404
+// Catch-all handler for 404s
 app.use((req, res) => {
-    res.status(404).json({ 
-        success: false, 
-        error: 'Route not found' 
+    res.status(404).json({
+        success: false,
+        error: 'Route not found',
+        path: req.path,
+        method: req.method
     });
 });
 

@@ -5,7 +5,7 @@ const customerRoutes = require('./routes/customerRoutes');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000; // Use environment port or default to 3000
+const PORT = process.env.PORT || 10000; // Use environment port or default to 10000
 
 console.log('Starting server with configuration:');
 console.log('NODE_ENV:', process.env.NODE_ENV);

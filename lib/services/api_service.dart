@@ -23,47 +23,31 @@ class ApiService {
     try {
       debugPrint('Making API call to: $uri');
       debugPrint('Method: $method');
-      debugPrint('Headers: ${defaultHeaders..addAll(headers ?? {})}');
+      debugPrint('Headers: $defaultHeaders');
       if (body != null) debugPrint('Body: $body');
 
-      http.Response response;
-      switch (method) {
-        case 'POST':
-          response = await http.post(
-            uri,
-            headers: {...defaultHeaders, ...?headers},
-            body: body != null ? json.encode(body) : null,
-          );
-          break;
-        default:
-          response = await http.get(
-            uri,
-            headers: {...defaultHeaders, ...?headers},
-          );
-      }
+      final response = await http.post(
+        uri,
+        headers: defaultHeaders,
+        body: json.encode(body),
+      );
 
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response body: ${response.body}');
 
       if (response.statusCode == 404) {
-        throw Exception('Endpoint not found: $endpoint');
+        throw Exception('API endpoint not found. Please check the URL and try again.');
       }
 
-      // Try to parse the response body
-      final Map<String, dynamic> responseData = 
-          json.decode(response.body) as Map<String, dynamic>;
-
-      if (responseData['success'] == null) {
-        throw Exception('Invalid response format');
-      }
-
+      final responseData = json.decode(response.body) as Map<String, dynamic>;
+      
       if (!responseData['success']) {
         throw Exception(responseData['error'] ?? 'Request failed');
       }
 
       return responseData;
     } catch (e) {
-      debugPrint('API call error: $e');
+      debugPrint('API call failed: $e');
       rethrow;
     }
   }

@@ -234,28 +234,19 @@ class LicenseService {
 
   Future<bool> verifyLicenseWithServer(String licenseKey, String email) async {
     try {
-        final response = await http.post(
-            Uri.parse(ApiConfig.verifyLicenseEndpoint),
-            headers: {
-                'Content-Type': 'application/json',
-                'x-admin-token': ApiConfig.adminToken,
-            },
-            body: json.encode({
+        final response = await apiService.apiCall(
+            '/api/admin/verify-license',
+            method: 'POST',
+            body: {
                 'licenseKey': licenseKey,
                 'email': email,
-            }),
+            },
         );
 
-        if (response.statusCode != 200) {
-            final error = json.decode(response.body);
-            throw Exception(error['error'] ?? 'Failed to verify license');
-        }
-
-        final data = json.decode(response.body);
-        return data['success'] ?? false;
+        return response['success'] ?? false;
     } catch (e) {
         debugPrint('License verification error: $e');
-        rethrow;
+        return false;
     }
   }
 }

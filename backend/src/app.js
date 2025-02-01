@@ -84,9 +84,22 @@ app.use(express.static(path.join(__dirname, '../../docs'), {
     }
 }));
 
-// Routes
+// Move routes registration before error handlers and after CORS
+app.use(cors(corsOptions));
+app.use(express.json());
+
+// Add admin routes first
+app.use('/api/admin', adminRoutes);
 app.use('/api/customers', customerRoutes);
-app.use('/api/admin', adminRoutes); // Make sure this comes after CORS
+
+// Add route debugging
+app.use((req, res, next) => {
+    console.log(`Route accessed: ${req.method} ${req.path}`, {
+        headers: req.headers,
+        body: req.body
+    });
+    next();
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

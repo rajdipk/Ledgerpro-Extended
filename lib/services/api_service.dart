@@ -45,9 +45,17 @@ class ApiService {
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response body: ${response.body}');
 
+      if (response.statusCode == 404) {
+        throw Exception('Endpoint not found: $endpoint');
+      }
+
       // Try to parse the response body
       final Map<String, dynamic> responseData = 
           json.decode(response.body) as Map<String, dynamic>;
+
+      if (responseData['success'] == null) {
+        throw Exception('Invalid response format');
+      }
 
       if (!responseData['success']) {
         throw Exception(responseData['error'] ?? 'Request failed');

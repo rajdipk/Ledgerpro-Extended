@@ -206,7 +206,14 @@ exports.verifyLicense = async (req, res) => {
         
         console.log('Verifying license:', { licenseKey, email });
 
-        // Find customer by email first
+        if (!licenseKey || !email) {
+            return res.status(400).json({
+                success: false,
+                error: 'License key and email are required'
+            });
+        }
+
+        // Find customer by email and license key
         const customer = await Customer.findOne({
             email: email.toLowerCase(),
             'license.key': licenseKey
@@ -215,38 +222,38 @@ exports.verifyLicense = async (req, res) => {
         console.log('Found customer:', customer);
 
         if (!customer) {
-            return res.status(400).json({
+            return res.json({
                 success: false,
                 error: 'Invalid license key or email'
             });
         }
 
+        // Check license status
         if (customer.license.status !== 'active') {
-            return res.status(400).json({
+            return res.json({
                 success: false,
                 error: 'License is not active'
             });
         }
 
-        const license = customer.license;
-        if (license.endDate && new Date() > new Date(license.endDate)) {
-            return res.status(400).json({
+        // Check expiry
+        if (customer.license.endDate && new Date() > new Date(customer.license.endDate)) {
+            return res.json({
                 success: false,
                 error: 'License has expired'
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data: {
                 license: customer.license,
-                customerEmail: customer.email,
-                features: license.features || {}
+                customerEmail: customer.email
             }
         });
     } catch (error) {
         console.error('License verification error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: error.message || 'Error verifying license'
         });

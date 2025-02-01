@@ -40,13 +40,10 @@ app.use((req, res, next) => {
 
 // Update CORS options
 const corsOptions = {
-    origin: ['https://rajdipk.github.io', 'https://ledgerpro-extended.onrender.com', 'http://localhost:5000'],
+    origin: '*', // Allow all origins temporarily for testing
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
-    exposedHeaders: ['x-admin-token'],
-    credentials: false, // Set to false since we're not using cookies
-    preflightContinue: false,
-    optionsSuccessStatus: 204
+    allowedHeaders: ['Content-Type', 'Accept', 'x-admin-token'],
+    credentials: false
 };
 
 // Apply CORS middleware
@@ -59,11 +56,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// Add request logging middleware
+// Add better request logging
 app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`, {
+    console.log(`${new Date().toISOString()} [${req.method}] ${req.path}`, {
+        headers: req.headers,
         body: req.body,
-        headers: req.headers
+        query: req.query
     });
     next();
 });
@@ -86,9 +84,9 @@ app.use(express.static(path.join(__dirname, '../../docs'), {
     }
 }));
 
-// Move API routes before error handlers
-app.use('/api/admin', adminRoutes);
+// Routes
 app.use('/api/customers', customerRoutes);
+app.use('/api/admin', adminRoutes); // Make sure this comes after CORS
 
 // Error handling middleware
 app.use((err, req, res, next) => {

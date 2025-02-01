@@ -18,12 +18,7 @@ router.options('*', (req, res) => {
 
 // Add request logging
 router.use((req, res, next) => {
-    console.log('Admin API Request:', {
-        method: req.method,
-        path: req.path,
-        body: req.body,
-        headers: req.headers
-    });
+    console.log('Admin route accessed:', req.method, req.path);
     next();
 });
 

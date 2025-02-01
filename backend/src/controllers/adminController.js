@@ -203,21 +203,24 @@ exports.createCustomer = async (req, res) => {
 exports.verifyLicense = async (req, res) => {
     try {
         const { licenseKey, email } = req.body;
+        
+        console.log('Verifying license:', { licenseKey, email });
 
-        // Find customer by license key and email
+        // Find customer by email first
         const customer = await Customer.findOne({
-            'license.key': licenseKey,
-            email: email.toLowerCase()
+            email: email.toLowerCase(),
+            'license.key': licenseKey
         });
 
+        console.log('Found customer:', customer);
+
         if (!customer) {
-            return res.status(404).json({
+            return res.status(400).json({
                 success: false,
                 error: 'Invalid license key or email'
             });
         }
 
-        // Verify license status
         if (customer.license.status !== 'active') {
             return res.status(400).json({
                 success: false,
@@ -225,8 +228,8 @@ exports.verifyLicense = async (req, res) => {
             });
         }
 
-        // Check expiry
-        if (customer.license.endDate && new Date() > new Date(customer.license.endDate)) {
+        const license = customer.license;
+        if (license.endDate && new Date() > new Date(license.endDate)) {
             return res.status(400).json({
                 success: false,
                 error: 'License has expired'
@@ -237,11 +240,15 @@ exports.verifyLicense = async (req, res) => {
             success: true,
             data: {
                 license: customer.license,
-                customerEmail: customer.email
+                customerEmail: customer.email,
+                features: license.features || {}
             }
         });
     } catch (error) {
         console.error('License verification error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Error verifying license'
+        });
     }
 };

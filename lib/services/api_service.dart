@@ -45,20 +45,15 @@ class ApiService {
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response body: ${response.body}');
 
-      if (response.statusCode != 200) {
-        Map<String, dynamic> errorData;
-        try {
-          errorData = json.decode(response.body);
-        } catch (e) {
-          errorData = {
-            'error': 'Invalid response: ${response.body}',
-            'status': response.statusCode
-          };
-        }
-        throw Exception(errorData['error'] ?? 'Request failed with status: ${response.statusCode}');
+      // Try to parse the response body
+      final Map<String, dynamic> responseData = 
+          json.decode(response.body) as Map<String, dynamic>;
+
+      if (!responseData['success']) {
+        throw Exception(responseData['error'] ?? 'Request failed');
       }
 
-      return json.decode(response.body);
+      return responseData;
     } catch (e) {
       debugPrint('API call error: $e');
       rethrow;

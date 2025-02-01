@@ -3,32 +3,41 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
 
-// Add basic route logging
+// Add error handling wrapper
+const asyncHandler = fn => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Handle CORS preflight requests
+router.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token');
+    res.sendStatus(204);
+});
+
+// Add request logging
 router.use((req, res, next) => {
-    console.log(`Admin route accessed: ${req.method} ${req.path}`);
+    console.log('Admin API Request:', {
+        method: req.method,
+        path: req.path,
+        body: req.body,
+        headers: req.headers
+    });
     next();
 });
 
-// Handle OPTIONS requests
-router.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token');
-    res.status(204).send();
-});
+// Routes that don't need auth
+router.post('/verify-license', asyncHandler(adminController.verifyLicense));
 
-// Apply admin auth middleware (except for OPTIONS requests)
-router.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-        return next();
-    }
-    adminAuth(req, res, next);
-});
+// Apply auth middleware for protected routes
+router.use(adminAuth);
 
-// Admin routes
-router.get('/dashboard', adminController.getDashboard);
-router.get('/customers', adminController.getCustomers);
-router.post('/customers', adminController.createCustomer);
-router.post('/update-pricing', adminController.updatePricing);
+// Protected routes
+router.get('/dashboard', asyncHandler(adminController.getDashboard));
+router.get('/customers', asyncHandler(adminController.getCustomers));
+router.post('/customers', asyncHandler(adminController.createCustomer));
+router.post('/update-pricing', asyncHandler(adminController.updatePricing));
 
 // Health check endpoint
 router.get('/health', (req, res) => {

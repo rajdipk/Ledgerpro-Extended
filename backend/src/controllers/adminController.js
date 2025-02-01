@@ -199,3 +199,49 @@ exports.createCustomer = async (req, res) => {
         });
     }
 };
+
+exports.verifyLicense = async (req, res) => {
+    try {
+        const { licenseKey, email } = req.body;
+
+        // Find customer by license key and email
+        const customer = await Customer.findOne({
+            'license.key': licenseKey,
+            email: email.toLowerCase()
+        });
+
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                error: 'Invalid license key or email'
+            });
+        }
+
+        // Verify license status
+        if (customer.license.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                error: 'License is not active'
+            });
+        }
+
+        // Check expiry
+        if (customer.license.endDate && new Date() > new Date(customer.license.endDate)) {
+            return res.status(400).json({
+                success: false,
+                error: 'License has expired'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                license: customer.license,
+                customerEmail: customer.email
+            }
+        });
+    } catch (error) {
+        console.error('License verification error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};

@@ -2,9 +2,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';  // Add this import for debugPrint
 import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http; // Add this import for http
 import '../database/database_helper.dart';
 import '../models/license_model.dart';
 import '../services/notification_service.dart';
+import '../config/api_config.dart';
 
 class LicenseService {
   static final LicenseService instance = LicenseService._();
@@ -62,7 +64,7 @@ class LicenseService {
 
       // Compare the key type with the selected type
       if (keyType != type) {
-        throw Exception('License key prefix (${keyPrefix}) does not match selected plan (${type.toString().split('.').last})');
+        throw Exception('License key prefix ($keyPrefix) does not match selected plan (${type.toString().split('.').last})');
       }
 
       final features = License.getDefaultFeatures(type);
@@ -228,5 +230,32 @@ class LicenseService {
       licenseId: license.id!,
       expiryDate: license.expiryDate!,
     );
+  }
+
+  Future<bool> verifyLicenseWithServer(String licenseKey, String email) async {
+    try {
+        final response = await http.post(
+            Uri.parse(ApiConfig.verifyLicenseEndpoint),
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-token': ApiConfig.adminToken,
+            },
+            body: json.encode({
+                'licenseKey': licenseKey,
+                'email': email,
+            }),
+        );
+
+        if (response.statusCode != 200) {
+            final error = json.decode(response.body);
+            throw Exception(error['error'] ?? 'Failed to verify license');
+        }
+
+        final data = json.decode(response.body);
+        return data['success'] ?? false;
+    } catch (e) {
+        debugPrint('License verification error: $e');
+        rethrow;
+    }
   }
 }

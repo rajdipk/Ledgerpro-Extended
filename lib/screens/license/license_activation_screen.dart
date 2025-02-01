@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/license_model.dart';
 import '../../providers/license_provider.dart';
 import '../../services/storage_service.dart';
+import '../../services/api_service.dart';
 
 class LicenseActivationScreen extends StatefulWidget {
   const LicenseActivationScreen({super.key});
@@ -71,43 +72,70 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
     setState(() => _isActivating = true);
 
     try {
-      final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
-      final success = await licenseProvider.activateLicense(
-        _licenseKeyController.text.trim(),
-        _emailController.text.trim(),
-        _selectedType,
-      );
+        final licenseKey = _licenseKeyController.text.trim();
+        final email = _emailController.text.trim();
 
-      if (!mounted) return;
+        debugPrint('Attempting to verify license: $licenseKey for email: $email');
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('License activated successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        // First verify the license with backend
+        final verifyResult = await ApiService.instance.apiCall(
+            '/api/admin/verify-license',
+            method: 'POST',
+            body: {
+                'licenseKey': licenseKey,
+                'email': email,
+            },
         );
-        Navigator.of(context).pop(true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(licenseProvider.error ?? 'Failed to activate license'),
-            backgroundColor: Colors.red,
-          ),
+
+        debugPrint('Verify result: $verifyResult');
+
+        if (!verifyResult['success']) {
+            throw Exception(verifyResult['error'] ?? 'Failed to verify license');
+        }
+
+        // Then activate locally
+        final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
+        final success = await licenseProvider.activateLicense(
+            licenseKey,
+            email,
+            _selectedType,
         );
-      }
+
+        if (!mounted) return;
+
+        if (success) {
+            // Save the verified credentials
+            await StorageService.instance.saveValue('license_email', email);
+            await StorageService.instance.saveValue('license_key', licenseKey);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('License activated successfully!'),
+                    backgroundColor: Colors.green,
+                ),
+            );
+            Navigator.of(context).pop(true);
+        } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text(licenseProvider.error ?? 'Failed to activate license'),
+                    backgroundColor: Colors.red,
+                ),
+            );
+        }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error activating license: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        debugPrint('License activation error details: $e');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Error activating license: ${e.toString()}'),
+                backgroundColor: Colors.red,
+            ),
+        );
     } finally {
-      if (mounted) {
-        setState(() => _isActivating = false);
-      }
+        if (mounted) {
+            setState(() => _isActivating = false);
+        }
     }
   }
 

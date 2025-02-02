@@ -19,20 +19,23 @@ class ApiService {
       final uri = Uri.parse('$baseUrl$endpoint');
       debugPrint('Making API call to: $uri');
       debugPrint('Method: $method');
-      debugPrint('Headers: $headers');
-      debugPrint('Body: $body');
 
       final defaultHeaders = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
 
+      final finalHeaders = {
+        ...defaultHeaders,
+        ...?headers,
+      };
+
+      debugPrint('Headers: $finalHeaders');
+      debugPrint('Body: $body');
+
       final response = await http.post(
         uri,
-        headers: {
-          ...defaultHeaders,
-          ...?headers,
-        },
+        headers: finalHeaders,
         body: body != null ? json.encode(body) : null,
       );
 

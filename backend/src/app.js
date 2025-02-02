@@ -45,8 +45,8 @@ app.use(cors(corsOptions));
 // Add OPTIONS handling for preflight requests
 app.options('*', cors(corsOptions));
 
-// Add route-specific CORS handling
-app.use('/api/customers/verify-license', (req, res, next) => {
+// Update route-specific CORS handling
+app.use(['/api/customers/verify-license', '/api/customers/deactivate-license'], (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Accept');

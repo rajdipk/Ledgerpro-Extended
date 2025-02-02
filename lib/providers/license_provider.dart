@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart';
 import '../models/license_model.dart';
 import '../services/license_service.dart';
 import '../database/database_helper.dart';
+import '../services/storage_service.dart';
+import '../services/api_service.dart';  // Add this import
 
 class LicenseProvider with ChangeNotifier {
   License? _currentLicense;
   String? _error;
+  final ApiService _apiService = ApiService.instance;  // Add this field
 
   String? get customerId => _currentLicense?.id?.toString();
   String? get customerEmail => _currentLicense?.customerEmail;
@@ -75,16 +78,44 @@ class LicenseProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deactivateLicense() async {
+  Future<bool> deactivateLicense() async {
     try {
-      await DatabaseHelper.instance.deleteLicense();
-      _currentLicense = null;
       _error = null;
+      
+      // Get current license info before deactivating
+      final currentLicense = _currentLicense;
+      if (currentLicense == null) {
+        return true; // Already deactivated
+      }
+
+      // Attempt to deactivate on server first
+      final result = await _apiService.apiCall(
+        '/api/customers/deactivate-license',
+        method: 'POST',
+        body: {
+          'licenseKey': currentLicense.licenseKey,
+          'email': currentLicense.customerEmail,
+        },
+      );
+
+      if (!result['success']) {
+        throw Exception(result['error'] ?? 'Failed to deactivate license on server');
+      }
+
+      // If server deactivation successful, clear local data
+      await LicenseService.instance.deactivateLicense();
+      await StorageService.instance.removeValue('license_email');
+      await StorageService.instance.removeValue('license_key');
+      
+      _currentLicense = null;
       notifyListeners();
+      
+      return true;
     } catch (e) {
-      debugPrint('Error deactivating license: $e');
-      _error = 'Failed to deactivate license';
+      debugPrint('License deactivation error: $e');
+      _error = 'Failed to deactivate license: ${e.toString()}';
       notifyListeners();
+      return false;
     }
   }
 

@@ -299,6 +299,51 @@ exports.verifyLicense = async (req, res) => {
     }
 };
 
+exports.deactivateLicense = async (req, res) => {
+    try {
+        const { licenseKey, email } = req.body;
+        
+        console.log('License deactivation request:', { licenseKey, email });
+
+        if (!licenseKey || !email) {
+            return res.status(400).json({
+                success: false,
+                error: 'License key and email are required'
+            });
+        }
+
+        // Find customer by email and license key
+        const customer = await Customer.findOne({
+            email: email.toLowerCase(),
+            'license.key': licenseKey
+        });
+
+        if (!customer) {
+            return res.json({
+                success: false,
+                error: 'Invalid license key or email'
+            });
+        }
+
+        // Update license status to inactive
+        customer.license.status = 'inactive';
+        customer.license.lastValidatedAt = null;
+        customer.license.offlineGracePeriodStart = null;
+        await customer.save();
+
+        return res.json({
+            success: true,
+            message: 'License deactivated successfully'
+        });
+    } catch (error) {
+        console.error('License deactivation error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message || 'Error deactivating license'
+        });
+    }
+};
+
 exports.trackDownload = async (req, res) => {
     try {
         const { licenseKey, platform, version } = req.body;

@@ -7,7 +7,8 @@ import '../database/database_helper.dart';
 import '../models/license_model.dart';
 import '../services/notification_service.dart';
 import '../config/api_config.dart';
-import '../services/api_service.dart'; // Add this import
+import '../services/api_service.dart';
+import 'storage_service.dart'; // Add this import
 
 class LicenseService {
   static final LicenseService instance = LicenseService._();
@@ -137,7 +138,25 @@ class LicenseService {
 
   // Deactivate current license
   Future<void> deactivateLicense() async {
-    await DatabaseHelper.instance.deleteLicense();
+    try {
+      final license = await DatabaseHelper.instance.getCurrentLicense();
+      if (license != null) {
+        // Cancel any scheduled notifications
+        await NotificationService.instance.cancelLicenseNotifications(license.id!);
+      }
+
+      // Clear license from database
+      await DatabaseHelper.instance.deleteLicense();
+
+      // Clear any cached data or states
+      await StorageService.instance.removeValue('last_validation');
+      await StorageService.instance.removeValue('offline_grace_start');
+      
+      debugPrint('License deactivated successfully');
+    } catch (e) {
+      debugPrint('Error deactivating license: $e');
+      rethrow;
+    }
   }
 
   // Track feature usage

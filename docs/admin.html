@@ -296,29 +296,50 @@
 
         // Update loadCustomers function
         async function loadCustomers(page = 1) {
+            const tableBody = document.getElementById('customerList');
+            const loadingRow = document.createElement('tr');
+            loadingRow.innerHTML = '<td colspan="6" class="text-center">Loading...</td>';
+            tableBody.innerHTML = '';
+            tableBody.appendChild(loadingRow);
+
             try {
                 const { data } = await apiCall(`/api/admin/customers?page=${page}&limit=10`);
                 
-                const customerList = document.getElementById('customerList');
-                customerList.innerHTML = '';
+                tableBody.innerHTML = '';
                 
                 data.customers.forEach(customer => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${customer.businessName}</td>
-                        <td>${customer.email}</td>
-                        <td>${customer.license.type}</td>
-                        <td><span class="badge bg-${customer.license.status === 'active' ? 'success' : 'warning'}">${customer.license.status}</span></td>
-                        <td>${customer.license.key || '-'}</td>
+                        <td>${escapeHtml(customer.businessName)}</td>
+                        <td>${escapeHtml(customer.email)}</td>
+                        <td>${escapeHtml(customer.license.type)}</td>
+                        <td>
+                            <span class="badge bg-${getStatusColor(customer.license.status)}">
+                                ${escapeHtml(customer.license.status)}
+                            </span>
+                        </td>
+                        <td>${customer.license.key ? escapeHtml(customer.license.key) : '-'}</td>
                         <td>${customer.license.endDate ? new Date(customer.license.endDate).toLocaleDateString() : '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" 
+                                    onclick="viewCustomerDetails('${customer._id}')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </td>
                     `;
-                    customerList.appendChild(row);
+                    tableBody.appendChild(row);
                 });
 
                 updatePagination(data.pagination, page);
             } catch (error) {
                 console.error('Error loading customers:', error);
-                alert('Failed to load customers: ' + error.message);
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-danger">
+                            Failed to load customers: ${error.message}
+                        </td>
+                    </tr>
+                `;
             }
         }
 
@@ -362,6 +383,9 @@
         // Update pricing form submission
         document.getElementById('pricingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            const button = this.querySelector('button[type="submit"]');
+            button.disabled = true;
+
             try {
                 const professional = Number(document.getElementById('professionalPrice').value);
                 const enterprise = Number(document.getElementById('enterprisePrice').value);
@@ -374,11 +398,13 @@
                 });
 
                 if (result.success) {
-                    alert('Pricing updated successfully');
+                    showSuccess('Pricing updated successfully');
                 }
             } catch (error) {
                 console.error('Error updating pricing:', error);
-                alert('Failed to update pricing: ' + error.message);
+                showError(error.message || 'Failed to update pricing');
+            } finally {
+                button.disabled = false;
             }
         });
 
@@ -409,6 +435,134 @@
         // Start the app
         document.addEventListener('DOMContentLoaded', () => {
             startDataRefresh();
+        });
+
+        // Add WebSocket handling
+        class AdminWebSocket {
+            constructor(url) {
+                this.url = url;
+                this.ws = null;
+                this.reconnectTimer = null;
+                this.connect();
+            }
+
+            connect() {
+                try {
+                    this.ws = new WebSocket(this.url);
+                    this.ws.onopen = () => {
+                        console.log('WebSocket connected');
+                        updateConnectionStatus(true, 'Connected to server');
+                        if (this.reconnectTimer) {
+                            clearInterval(this.reconnectTimer);
+                            this.reconnectTimer = null;
+                        }
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (error) {
+                            console.error('Error parsing WebSocket message:', error);
+                        }
+                    };
+
+                    this.ws.onclose = () => {
+                        console.log('WebSocket disconnected');
+                        updateConnectionStatus(false, 'Connection lost');
+                        this.scheduleReconnect();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        updateConnectionStatus(false, 'Connection error');
+                    };
+                } catch (error) {
+                    console.error('WebSocket connection error:', error);
+                    this.scheduleReconnect();
+                }
+            }
+
+            handleMessage(data) {
+                switch (data.type) {
+                    case 'PRICE_UPDATE':
+                        updatePricingFields(data.data);
+                        loadDashboard(); // Refresh dashboard data
+                        break;
+                    case 'CUSTOMER_UPDATE':
+                        loadCustomers(); // Refresh customer list
+                        break;
+                    case 'ERROR':
+                        showError(data.message);
+                        break;
+                    default:
+                        console.log('Unknown message type:', data.type);
+                }
+            }
+
+            scheduleReconnect() {
+                if (!this.reconnectTimer) {
+                    this.reconnectTimer = setInterval(() => {
+                        console.log('Attempting to reconnect...');
+                        this.connect();
+                    }, 5000);
+                }
+            }
+
+            close() {
+                if (this.ws) {
+                    this.ws.close();
+                }
+            }
+        }
+
+        // Update the price fields in the form
+        function updatePricingFields(data) {
+            document.getElementById('professionalPrice').value = data.professional;
+            document.getElementById('enterprisePrice').value = data.enterprise;
+        }
+
+        // Show error messages
+        function showError(message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 end 0 m-3';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => alertDiv.remove(), 5000);
+        }
+
+        // Initialize WebSocket connection
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname === 'localhost' ? 
+            'localhost:10000' : 
+            'ledgerpro-extended.onrender.com';
+        const wsClient = new AdminWebSocket(`${wsProtocol}//${wsHost}`);
+
+        // Helper functions
+        function getStatusColor(status) {
+            switch (status) {
+                case 'active': return 'success';
+                case 'pending': return 'warning';
+                case 'expired': return 'danger';
+                default: return 'secondary';
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Clean up on page unload
+        window.addEventListener('unload', () => {
+            wsClient.close();
         });
     </script>
 </body>

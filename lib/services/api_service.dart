@@ -22,11 +22,15 @@ class ApiService {
       debugPrint('Headers: $headers');
       debugPrint('Body: $body');
 
+      final defaultHeaders = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
       final response = await http.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          ...defaultHeaders,
           ...?headers,
         },
         body: body != null ? json.encode(body) : null,

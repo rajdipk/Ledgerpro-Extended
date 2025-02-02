@@ -11,13 +11,14 @@ const asyncHandler = fn => (req, res, next) => {
 router.use('/verify-license', (req, res, next) => {
     console.log('License verification request:', {
         body: req.body,
-        headers: req.headers
+        headers: req.headers,
+        method: req.method
     });
     next();
 });
 
 // Public routes
-router.post('/verify-license', asyncHandler(customerController.verifyLicense));  // Update verify-license endpoint to handle both activation and verification
+router.post('/verify-license', customerController.verifyLicense);  // Update verify-license endpoint to handle both activation and verification
 router.post('/register', asyncHandler(customerController.register));
 router.post('/activate-license', asyncHandler(customerController.activateLicense));
 router.post('/verify-payment', asyncHandler(customerController.verifyPayment));

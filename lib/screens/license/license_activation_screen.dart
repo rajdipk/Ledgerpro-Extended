@@ -79,7 +79,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
 
         // First verify the license with backend
         final verifyResult = await ApiService.instance.apiCall(
-            '/api/admin/verify-license',
+            '/api/customers/verify-license',  // Changed from /api/admin/verify-license
             method: 'POST',
             body: {
                 'licenseKey': licenseKey,

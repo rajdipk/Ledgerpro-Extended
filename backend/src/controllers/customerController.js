@@ -268,9 +268,8 @@ exports.verifyLicense = async (req, res) => {
             });
         }
 
-        // Get license features
-        const features = require('../utils/license')
-            .getLicenseFeatures(customer.license.type);
+        // Get license features using the instance method
+        const features = licenseManager.getLicenseFeatures(customer.license.type);
 
         return res.json({
             success: true,
@@ -280,7 +279,13 @@ exports.verifyLicense = async (req, res) => {
                     type: customer.license.type,
                     status: customer.license.status,
                     endDate: customer.license.endDate,
-                    features: features
+                    features: features.features,
+                    limits: {
+                        customer_limit: features.customer_limit,
+                        inventory_limit: features.inventory_limit,
+                        invoice_limit: features.invoice_limit,
+                        monthly_transaction_limit: features.monthly_transaction_limit
+                    }
                 },
                 customerEmail: customer.email
             }

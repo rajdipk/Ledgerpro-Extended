@@ -1,8 +1,10 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
-const customerRoutes = require('./routes/customerRoutes');
-require('dotenv').config();
+const { connect } = require('mongoose'); // Update mongoose import
+const adminRoutes = require('./routes/adminRoutes'); // Add admin routes
+const customerRoutes = require('./routes/customerRoutes'); // Add customer routes
 
 const app = express();
 const PORT = process.env.PORT || 10000; // Use environment port or default to 10000
@@ -11,6 +13,8 @@ console.log('Starting server with configuration:');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', PORT);
 console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Set' : 'Not set');
+console.log('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? 'Set' : 'Not Set');
+console.log('SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not Set');
 
 // CORS Configuration
 const corsOptions = {
@@ -114,14 +118,11 @@ app.use((req, res) => {
   });
 });
 
-// MongoDB connection with retry logic
+// Updated MongoDB connection options for Node.js 22
 const connectWithRetry = async () => {
   console.log('Attempting MongoDB connection...');
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      family: 4,
+    await connect(process.env.MONGODB_URI, {
       maxPoolSize: 10,
       minPoolSize: 1,
       maxIdleTimeMS: 30000,
@@ -131,12 +132,9 @@ const connectWithRetry = async () => {
     
     console.log('Connected to MongoDB');
     
-    // Only start server after successful MongoDB connection
     const server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
-      // Log server address info
-      const addr = server.address();
-      console.log(`Server listening on ${typeof addr === 'string' ? addr : `${addr.address}:${addr.port}`}`);
+      console.log('Node.js version:', process.version);
     });
   } catch (error) {
     console.error('MongoDB connection error:', error);
@@ -147,3 +145,7 @@ const connectWithRetry = async () => {
 
 // Initial connection attempt
 connectWithRetry();
+
+// Comment out or remove this line until serviceCheck is implemented
+// const checkServices = require('./utils/serviceCheck');
+// checkServices();

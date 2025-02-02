@@ -1,6 +1,6 @@
 const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
+const http = require('node:http'); // Use node: prefix for built-in modules
+const { WebSocketServer } = require('ws'); // Updated WebSocket import
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -14,8 +14,8 @@ const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 const server = http.createServer(app);
 
-// Initialize WebSocket server
-const wss = new WebSocket.Server({ server });
+// Initialize WebSocket server with new syntax
+const wss = new WebSocketServer({ server });
 
 // Store WebSocket instance globally
 global.wss = wss;

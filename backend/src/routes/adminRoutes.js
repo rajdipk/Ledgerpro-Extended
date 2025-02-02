@@ -8,27 +8,8 @@ const asyncHandler = fn => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// Debug middleware
-router.use((req, res, next) => {
-    console.log('Admin route accessed:', {
-        path: req.path,
-        method: req.method,
-        body: req.body,
-        headers: req.headers
-    });
-    next();
-});
-
-// Public routes (no auth needed)
-router.post('/verify-license', asyncHandler(adminController.verifyLicense));
-
-// Auth middleware for protected routes
-router.use((req, res, next) => {
-    if (req.path === '/verify-license' && req.method === 'POST') {
-        return next();
-    }
-    adminAuth(req, res, next);
-});
+// Auth middleware for all admin routes
+router.use(adminAuth);
 
 // Protected routes
 router.get('/dashboard', asyncHandler(adminController.getDashboard));

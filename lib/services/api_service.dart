@@ -17,6 +17,11 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl$endpoint');
+      debugPrint('Making API call to: $uri');
+      debugPrint('Method: $method');
+      debugPrint('Headers: $headers');
+      debugPrint('Body: $body');
+
       final response = await http.post(
         uri,
         headers: {
@@ -27,20 +32,19 @@ class ApiService {
         body: body != null ? json.encode(body) : null,
       );
 
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
       if (response.statusCode == 404) {
         throw Exception('API endpoint not found. Please check the URL and try again.');
       }
 
       if (response.statusCode != 200) {
-        throw Exception('Server error: ${response.statusCode}');
+        final error = json.decode(response.body);
+        throw Exception(error['error'] ?? 'Server error: ${response.statusCode}');
       }
 
-      final data = json.decode(response.body);
-      if (data['success'] == false) {
-        throw Exception(data['error'] ?? 'Unknown error occurred');
-      }
-
-      return data;
+      return json.decode(response.body);
     } catch (e) {
       debugPrint('API call failed: $e');
       rethrow;

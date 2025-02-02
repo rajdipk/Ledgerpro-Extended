@@ -240,7 +240,7 @@ class LicenseService {
         debugPrint('Verifying license with server - Key: $licenseKey, Email: $email');
         
         final response = await _apiService.apiCall(
-            '/api/customers/verify-license',
+            '/api/customers/verify-license',  // Changed from /api/admin/verify-license
             method: 'POST',
             body: {
                 'licenseKey': licenseKey,
@@ -254,25 +254,14 @@ class LicenseService {
             throw Exception(response['error'] ?? 'License verification failed');
         }
 
-        // Store verified license data
+        // Store verified license data if successful
         if (response['data']?.containsKey('license')) {
-            final licenseData = response['data']['license'];
-            final license = License(
-                licenseKey: licenseKey,
-                licenseType: _getLicenseTypeFromString(licenseData['type']),
-                activationDate: DateTime.now(),
-                expiryDate: licenseData['endDate'] != null ? 
-                    DateTime.parse(licenseData['endDate']) : null,
-                features: Map<String, dynamic>.from(licenseData['features'] ?? {}),
-                customerEmail: email,
+            await DatabaseHelper.instance.saveLicense(
+                License.fromMap(response['data']['license'])
             );
-            
-            await DatabaseHelper.instance.saveLicense(license);
-            await scheduleExpiryNotifications(license);
-            return true;
         }
 
-        return false;
+        return true;
     } catch (e) {
         debugPrint('License verification error: $e');
         return false;

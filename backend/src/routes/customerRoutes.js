@@ -7,9 +7,18 @@ const asyncHandler = fn => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// Debug middleware for license verification
+router.use('/verify-license', (req, res, next) => {
+    console.log('License verification request:', {
+        body: req.body,
+        headers: req.headers
+    });
+    next();
+});
+
 // Public routes
-router.post('/register', asyncHandler(customerController.register));
 router.post('/verify-license', asyncHandler(customerController.verifyLicense));  // Update verify-license endpoint to handle both activation and verification
+router.post('/register', asyncHandler(customerController.register));
 router.post('/activate-license', asyncHandler(customerController.activateLicense));
 router.post('/verify-payment', asyncHandler(customerController.verifyPayment));
 router.get('/payment-status/:orderId', asyncHandler(customerController.getPaymentStatus));

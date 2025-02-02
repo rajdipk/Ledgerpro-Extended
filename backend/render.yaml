@@ -1,40 +1,13 @@
 services:
   - type: web
-    name: ledgerpro-extended
+    name: ledgerpro-backend
     env: node
-    nodeVersion: 18.19.0
-    region: singapore
-    plan: free
-    buildCommand: npm install
-    startCommand: node src/index.js
-    autoDeploy: true
-    healthCheckPath: /api/health
+    buildCommand: npm run build
+    startCommand: npm start
+    nodeVersion: 18.17.1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
-      - key: MONGODB_URI
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: JWT_EXPIRY
-        value: 30d
-      - key: RAZORPAY_KEY_ID
-        sync: false
-      - key: RAZORPAY_KEY_SECRET
-        sync: false
-      - key: RAZORPAY_WEBHOOK_SECRET
-        sync: false
-      - key: SMTP_HOST
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: 587
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: LICENSE_KEY_SECRET
-        sync: false
-      - key: DEMO_PERIOD_DAYS
-        value: 30
+      - key: NPM_CONFIG_PRODUCTION
+        value: true
+    autoDeploy: true

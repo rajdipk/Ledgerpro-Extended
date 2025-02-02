@@ -2,7 +2,8 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const { connect } = require('mongoose'); // Update mongoose import
+const mongoose = require('mongoose');
+const { connect } = mongoose; // Update mongoose import
 const adminRoutes = require('./routes/adminRoutes'); // Add admin routes
 const customerRoutes = require('./routes/customerRoutes'); // Add customer routes
 

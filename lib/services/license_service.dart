@@ -237,8 +237,11 @@ class LicenseService {
 
   Future<bool> verifyLicenseWithServer(String licenseKey, String email) async {
     try {
+        debugPrint('Verifying license with server - Key: $licenseKey, Email: $email');
+        
+        // Update endpoint to use customer routes
         final response = await _apiService.apiCall(
-            '/api/admin/verify-license',
+            endpoint: '/api/customers/verify-license',
             method: 'POST',
             body: {
                 'licenseKey': licenseKey,
@@ -246,7 +249,18 @@ class LicenseService {
             },
         );
 
-        return response['success'] ?? false;
+        if (!response['success']) {
+            throw Exception(response['error'] ?? 'License verification failed');
+        }
+
+        // Store verified license data
+        if (response['data']?.containsKey('license')) {
+            await DatabaseHelper.instance.saveLicense(
+                License.fromMap(response['data']['license'])
+            );
+        }
+
+        return true;
     } catch (e) {
         debugPrint('License verification error: $e');
         return false;

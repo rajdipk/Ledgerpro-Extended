@@ -155,7 +155,7 @@
 
         .pricing-features li {
             margin: 0.8rem 0;
-            color: var(--text);
+            color: var (--text);
         }
 
         .pricing-features i {
@@ -1015,6 +1015,7 @@
             }
         });
 
+        // Update WebSocket client implementation
         class WebSocketClient {
             constructor(url, options = {}) {
                 this.url = url;
@@ -1024,6 +1025,7 @@
                     ...options
                 };
                 this.reconnectAttempts = 0;
+                this.handlers = new Map();
                 this.connect();
             }
 
@@ -1047,8 +1049,16 @@
             handleMessage(event) {
                 try {
                     const message = JSON.parse(event.data);
-                    if (message.type === 'PRICE_UPDATE') {
-                        this.updatePrices(message.data);
+                    switch (message.type) {
+                        case 'PRICE_UPDATE':
+                            this.updatePrices(message.data);
+                            break;
+                        case 'ERROR':
+                            console.error('Server error:', message.message);
+                            showMessage(message.message, 'error');
+                            break;
+                        default:
+                            console.log('Unknown message type:', message.type);
                     }
                 } catch (error) {
                     console.error('Error processing WebSocket message:', error);
@@ -1059,14 +1069,14 @@
                 // Update professional price display
                 const professionalPriceElements = document.querySelectorAll('.professional-price');
                 professionalPriceElements.forEach(element => {
-                    element.textContent = `₹${data.professional}`;
+                    element.innerHTML = `₹${data.professional}<span class="price-duration">/month</span>`;
                 });
 
-                // Update enterprise price display if needed
-                if (data.enterprise > 0) {
+                // Update enterprise price if available
+                if (data.enterprise) {
                     const enterprisePriceElements = document.querySelectorAll('.enterprise-price');
                     enterprisePriceElements.forEach(element => {
-                        element.textContent = `₹${data.enterprise}`;
+                        element.innerHTML = `₹${data.enterprise}<span class="price-duration">/year</span>`;
                     });
                 }
 
@@ -1077,8 +1087,7 @@
                         option => option.value === 'professional'
                     );
                     if (professionalOption) {
-                        professionalOption.textContent = 
-                            `Professional License - ₹${data.professional}/month`;
+                        professionalOption.textContent = `Professional License - ₹${data.professional}/month`;
                     }
                 }
             }

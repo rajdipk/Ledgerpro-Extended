@@ -1,11 +1,11 @@
 const express = require('express');
 const http = require('node:http'); // Use node: prefix for built-in modules
-const { WebSocketServer } = require('ws'); // Updated WebSocket import
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
 const mongoose = require('mongoose'); // Add mongoose import
+const webSocketService = require('./services/websocketService');
 
 // Import routes
 const customerRoutes = require('./routes/customerRoutes');
@@ -14,17 +14,15 @@ const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 const server = http.createServer(app);
 
-// Initialize WebSocket server with new syntax
-const wss = new WebSocketServer({ server });
+// Initialize WebSocket service
+webSocketService.initialize(server);
+global.webSocketService = webSocketService;
 
-// Store WebSocket instance globally
-global.wss = wss;
-
-// WebSocket connection handling
-wss.on('connection', (ws) => {
-    console.log('New WebSocket client connected');
-    ws.on('error', console.error);
-});
+// Initialize prices in global scope
+global.prices = {
+    professional: 599,
+    enterprise: 999
+};
 
 // Middleware setup
 app.use(helmet());
@@ -57,6 +55,15 @@ app.use('/api/customers', customerRoutes);
 // Error handler
 app.use((err, req, res, next) => {
     console.error('Error:', err);
+    
+    // Notify connected clients about errors if needed
+    if (err.shouldBroadcast) {
+        webSocketService.broadcastMessage({
+            type: 'ERROR',
+            message: err.message
+        });
+    }
+
     res.status(err.status || 500).json({
         success: false,
         error: err.message || 'Internal server error'
@@ -79,4 +86,4 @@ server.listen(PORT, () => {
     console.log(`Starting server in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
 
-module.exports = { app, server, wss };
+module.exports = { app, server, webSocketService };

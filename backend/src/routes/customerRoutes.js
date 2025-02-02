@@ -2,20 +2,20 @@ const express = require('express');
 const router = express.Router();
 const customerController = require('../controllers/customerController');
 
-// Customer registration
-router.post('/register', customerController.register);
+// Error handler wrapper
+const asyncHandler = fn => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+};
 
-// Payment verification
-router.post('/verify-payment', customerController.verifyPayment);
-
-// Payment status check
-router.get('/payment-status/:orderId', customerController.getPaymentStatus);
+// Public routes
+router.post('/register', asyncHandler(customerController.register));
+router.post('/verify-license', asyncHandler(customerController.verifyLicense));  // Update verify-license endpoint to handle both activation and verification
+router.post('/activate-license', asyncHandler(customerController.activateLicense));
+router.post('/verify-payment', asyncHandler(customerController.verifyPayment));
+router.get('/payment-status/:orderId', asyncHandler(customerController.getPaymentStatus));
 
 // Razorpay webhook
 router.post('/webhook', customerController.handleWebhook);
-
-// License verification
-router.post('/verify-license', customerController.verifyLicense);
 
 // Download tracking
 router.post('/track-download', customerController.trackDownload);

@@ -226,34 +226,41 @@ exports.verifyPayment = async (req, res) => {
 
 exports.verifyLicense = async (req, res) => {
     try {
-        const { licenseKey } = req.body;
+        const { licenseKey, email } = req.body;
+        
+        const customer = await Customer.findOne({
+            email: email.toLowerCase(),
+            'license.key': licenseKey
+        });
 
-        console.log('License verification request:', { licenseKey });
-
-        const customer = await Customer.findByLicenseKey(licenseKey);
-        if (!customer) {
-            return res.status(404).json({
+        if (!customer || customer.license.status !== 'active') {
+            return res.json({
                 success: false,
-                error: 'License key not found'
+                error: 'Invalid or inactive license'
             });
         }
 
-        const isValid = customer.isLicenseValid();
-        
-        res.json({
+        // Check expiry
+        if (customer.license.endDate && new Date() > new Date(customer.license.endDate)) {
+            return res.json({
+                success: false,
+                error: 'License expired'
+            });
+        }
+
+        // Return full license data
+        return res.json({
             success: true,
             data: {
-                isValid,
-                licenseType: customer.license.type,
-                expiryDate: customer.license.endDate,
+                license: customer.license,
                 features: licenseManager.getLicenseFeatures(customer.license.type)
             }
         });
     } catch (error) {
         console.error('License verification error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            error: error.message || 'License verification failed'
+            error: error.message
         });
     }
 };

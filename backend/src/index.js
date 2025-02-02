@@ -18,6 +18,7 @@ const corsOptions = {
     'https://rajdipk.github.io',
     'http://localhost:3000',
     'http://localhost:5000',
+    'http://localhost:10000',
     'https://ledgerpro-extended.onrender.com'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

@@ -34,11 +34,16 @@ app.use(express.urlencoded({ extended: true }));
 const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
-    credentials: false
+    allowedHeaders: ['Content-Type', 'Accept', 'x-admin-token'],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    credentials: false,
+    maxAge: 86400 // 24 hours
 };
 
 app.use(cors(corsOptions));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors(corsOptions));
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {

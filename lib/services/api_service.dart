@@ -5,6 +5,8 @@ import '../config/api_config.dart';
 
 class ApiService {
   static final ApiService instance = ApiService._();
+  final String baseUrl = 'https://ledgerpro-extended.onrender.com';
+
   ApiService._();
 
   Future<Map<String, dynamic>> apiCall(
@@ -13,39 +15,32 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? headers,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final defaultHeaders = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'x-admin-token': ApiConfig.adminToken,
-    };
-
     try {
-      debugPrint('Making API call to: $uri');
-      debugPrint('Method: $method');
-      debugPrint('Headers: $defaultHeaders');
-      if (body != null) debugPrint('Body: $body');
-
+      final uri = Uri.parse('$baseUrl$endpoint');
       final response = await http.post(
         uri,
-        headers: defaultHeaders,
-        body: json.encode(body),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...?headers,
+        },
+        body: body != null ? json.encode(body) : null,
       );
-
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
 
       if (response.statusCode == 404) {
         throw Exception('API endpoint not found. Please check the URL and try again.');
       }
 
-      final responseData = json.decode(response.body) as Map<String, dynamic>;
-      
-      if (!responseData['success']) {
-        throw Exception(responseData['error'] ?? 'Request failed');
+      if (response.statusCode != 200) {
+        throw Exception('Server error: ${response.statusCode}');
       }
 
-      return responseData;
+      final data = json.decode(response.body);
+      if (data['success'] == false) {
+        throw Exception(data['error'] ?? 'Unknown error occurred');
+      }
+
+      return data;
     } catch (e) {
       debugPrint('API call failed: $e');
       rethrow;

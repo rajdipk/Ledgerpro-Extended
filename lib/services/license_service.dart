@@ -239,9 +239,8 @@ class LicenseService {
     try {
         debugPrint('Verifying license with server - Key: $licenseKey, Email: $email');
         
-        // Update endpoint to use customer routes
         final response = await _apiService.apiCall(
-            endpoint: '/api/customers/verify-license',
+            '/api/customers/verify-license',
             method: 'POST',
             body: {
                 'licenseKey': licenseKey,
@@ -249,21 +248,47 @@ class LicenseService {
             },
         );
 
+        debugPrint('License verification response: $response');
+
         if (!response['success']) {
             throw Exception(response['error'] ?? 'License verification failed');
         }
 
         // Store verified license data
         if (response['data']?.containsKey('license')) {
-            await DatabaseHelper.instance.saveLicense(
-                License.fromMap(response['data']['license'])
+            final licenseData = response['data']['license'];
+            final license = License(
+                licenseKey: licenseKey,
+                licenseType: _getLicenseTypeFromString(licenseData['type']),
+                activationDate: DateTime.now(),
+                expiryDate: licenseData['endDate'] != null ? 
+                    DateTime.parse(licenseData['endDate']) : null,
+                features: Map<String, dynamic>.from(licenseData['features'] ?? {}),
+                customerEmail: email,
             );
+            
+            await DatabaseHelper.instance.saveLicense(license);
+            await scheduleExpiryNotifications(license);
+            return true;
         }
 
-        return true;
+        return false;
     } catch (e) {
         debugPrint('License verification error: $e');
         return false;
+    }
+  }
+
+  LicenseType _getLicenseTypeFromString(String type) {
+    switch (type.toLowerCase()) {
+      case 'demo':
+        return LicenseType.demo;
+      case 'professional':
+        return LicenseType.professional;
+      case 'enterprise':
+        return LicenseType.enterprise;
+      default:
+        throw Exception('Invalid license type: $type');
     }
   }
 }

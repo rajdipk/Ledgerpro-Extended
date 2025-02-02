@@ -228,15 +228,35 @@ exports.verifyLicense = async (req, res) => {
     try {
         const { licenseKey, email } = req.body;
         
+        console.log('License verification request:', { licenseKey, email });
+
+        if (!licenseKey || !email) {
+            return res.status(400).json({
+                success: false,
+                error: 'License key and email are required'
+            });
+        }
+
+        // Find customer by email and license key
         const customer = await Customer.findOne({
             email: email.toLowerCase(),
             'license.key': licenseKey
         });
 
-        if (!customer || customer.license.status !== 'active') {
+        console.log('Found customer:', customer);
+
+        if (!customer) {
             return res.json({
                 success: false,
-                error: 'Invalid or inactive license'
+                error: 'Invalid license key or email'
+            });
+        }
+
+        // Check license status
+        if (customer.license.status !== 'active') {
+            return res.json({
+                success: false,
+                error: `License is ${customer.license.status}`
             });
         }
 
@@ -244,23 +264,32 @@ exports.verifyLicense = async (req, res) => {
         if (customer.license.endDate && new Date() > new Date(customer.license.endDate)) {
             return res.json({
                 success: false,
-                error: 'License expired'
+                error: 'License has expired'
             });
         }
 
-        // Return full license data
+        // Get license features
+        const features = require('../utils/license')
+            .getLicenseFeatures(customer.license.type);
+
         return res.json({
             success: true,
             data: {
-                license: customer.license,
-                features: licenseManager.getLicenseFeatures(customer.license.type)
+                license: {
+                    key: customer.license.key,
+                    type: customer.license.type,
+                    status: customer.license.status,
+                    endDate: customer.license.endDate,
+                    features: features
+                },
+                customerEmail: customer.email
             }
         });
     } catch (error) {
         console.error('License verification error:', error);
         return res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message || 'Error verifying license'
         });
     }
 };

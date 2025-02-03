@@ -42,32 +42,40 @@ class LicenseProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> activateLicense(String licenseKey, String email, LicenseType type) async {
+  Future<bool> activateLicense(
+    String licenseKey,
+    String email,
+    LicenseType type, {
+    Map<String, dynamic>? licenseData,
+  }) async {
     try {
-      _error = null; // Reset any previous errors
+      _error = null;
       
-      // Validate inputs
       if (licenseKey.isEmpty || email.isEmpty) {
         _error = 'License key and email are required';
         notifyListeners();
         return false;
       }
 
-      // Activate license using LicenseService
-      final license = await LicenseService.instance.activateLicense(
-        licenseKey.trim(),
-        email.trim(),
-        type,
+      // Create license object from server data or defaults
+      final license = License(
+        licenseKey: licenseKey,
+        licenseType: type,
+        activationDate: DateTime.now(),
+        expiryDate: licenseData?['endDate'] != null ? 
+            DateTime.parse(licenseData!['endDate']) : null,
+        features: licenseData?['features'] ?? License.getDefaultFeatures(type),
+        limits: licenseData?['limits'] ?? {},  // Now this is properly defined
+        customerEmail: email,
       );
 
-      if (license == null) {
-        _error = 'Failed to activate license';
-        notifyListeners();
-        return false;
+      // Save license locally
+      final activatedLicense = await LicenseService.instance.activateLicense(license);
+      if (activatedLicense == null) {
+        throw Exception('Failed to activate license');
       }
-
-      // Store the activated license
-      _currentLicense = license;
+      
+      _currentLicense = activatedLicense;
       notifyListeners();
       return true;
     } catch (e) {
@@ -82,13 +90,12 @@ class LicenseProvider with ChangeNotifier {
     try {
       _error = null;
       
-      // Get current license info before deactivating
       final currentLicense = _currentLicense;
       if (currentLicense == null) {
         return true; // Already deactivated
       }
 
-      // Attempt to deactivate on server first
+      // Attempt to deactivate on server
       final result = await _apiService.apiCall(
         '/api/customers/deactivate-license',
         method: 'POST',
@@ -99,10 +106,10 @@ class LicenseProvider with ChangeNotifier {
       );
 
       if (!result['success']) {
-        throw Exception(result['error'] ?? 'Failed to deactivate license on server');
+        throw Exception(result['error'] ?? 'Failed to deactivate license');
       }
 
-      // If server deactivation successful, clear local data
+      // Clear local data
       await LicenseService.instance.deactivateLicense();
       await StorageService.instance.removeValue('license_email');
       await StorageService.instance.removeValue('license_key');
@@ -113,7 +120,7 @@ class LicenseProvider with ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('License deactivation error: $e');
-      _error = 'Failed to deactivate license: ${e.toString()}';
+      _error = e.toString();
       notifyListeners();
       return false;
     }

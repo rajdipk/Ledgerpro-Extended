@@ -325,11 +325,14 @@ exports.deactivateLicense = async (req, res) => {
             });
         }
 
-        // Update license status to inactive
-        customer.license.status = 'inactive';
+        // Update license status to suspended
+        customer.license.status = 'suspended';  // Using a valid enum value
         customer.license.lastValidatedAt = null;
         customer.license.offlineGracePeriodStart = null;
+
+        // Save changes
         await customer.save();
+        console.log('License deactivated successfully for customer:', customer._id);
 
         return res.json({
             success: true,

@@ -7,22 +7,24 @@ enum LicenseType {
 }
 
 class License {
+  final int? id;
   final String licenseKey;
   final LicenseType licenseType;
   final DateTime activationDate;
   final DateTime? expiryDate;
   final Map<String, dynamic> features;
+  final Map<String, dynamic> limits;  // Add this field
   final String? customerEmail;
-  final int? id;
 
   License({
+    this.id,
     required this.licenseKey,
     required this.licenseType,
     required this.activationDate,
     this.expiryDate,
     required this.features,
+    this.limits = const {},  // Add default value
     this.customerEmail,
-    this.id,
   });
 
   bool isExpired() {
@@ -112,10 +114,11 @@ class License {
     return {
       'id': id,
       'license_key': licenseKey,
-      'license_type': licenseType.toString(),
+      'license_type': licenseType.toString().split('.').last,
       'activation_date': activationDate.toIso8601String(),
       'expiry_date': expiryDate?.toIso8601String(),
       'features': features,
+      'limits': limits,  // Add this field
       'customer_email': customerEmail,
     };
   }
@@ -132,6 +135,7 @@ class License {
           ? DateTime.parse(map['expiry_date'] as String)
           : null,
       features: Map<String, dynamic>.from(map['features'] as Map),
+      limits: Map<String, dynamic>.from(map['limits'] ?? {}),  // Add this field
       customerEmail: map['customer_email'] as String?,
     );
   }

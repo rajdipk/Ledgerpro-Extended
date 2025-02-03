@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Accept', 'x-admin-token'],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     credentials: false,
     maxAge: 86400 // 24 hours
@@ -44,6 +44,14 @@ app.use(cors(corsOptions));
 
 // Add OPTIONS handling for preflight requests
 app.options('*', cors(corsOptions));
+
+// Add specific handling for admin routes
+app.use('/api/admin/*', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, x-admin-token');
+    next();
+});
 
 // Update route-specific CORS handling
 app.use(['/api/customers/verify-license', '/api/customers/deactivate-license'], (req, res, next) => {

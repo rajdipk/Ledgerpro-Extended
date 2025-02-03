@@ -31,7 +31,7 @@ class _UpgradeScreenState extends State<UpgradeScreen> {
     },
     LicenseType.professional: {
       'name': 'Professional',
-      'price': '\$29.99/month',
+      'price': '\$9.99/month',
       'features': [
         {'name': 'Advanced inventory management', 'included': true},
         {'name': 'Up to 1000 customers', 'included': true},

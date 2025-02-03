@@ -51,47 +51,66 @@ class LicenseService {
   }
 
   // Activate a new license
-  Future<License?> activateLicense(String licenseKey, String email, LicenseType type) async {
+  Future<License?> activateLicense(dynamic input) async {
     try {
-      if (!isValidKeyFormat(licenseKey)) {
-        throw Exception('Invalid license key format');
-      }
-
-      // Extract the license type from the key
-      final keyPrefix = licenseKey.split('-')[0];
-      final keyType = switch (keyPrefix) {
-        'DEMO' => LicenseType.demo,
-        'PRO' => LicenseType.professional,
-        'ENT' => LicenseType.enterprise,
-        _ => throw Exception('Invalid license key prefix'),
-      };
-
-      // Compare the key type with the selected type
-      if (keyType != type) {
-        throw Exception('License key prefix ($keyPrefix) does not match selected plan (${type.toString().split('.').last})');
-      }
-
-      final features = License.getDefaultFeatures(type);
-      final activationDate = DateTime.now();
+      License license;
       
-      // Calculate expiry date based on license type
-      final expiryDays = features['expiry_days'] as int? ?? 30; // Default to 30 days
-      final expiryDate = activationDate.add(Duration(days: expiryDays));
+      if (input is License) {
+        // Case 1: Input is already a License object
+        license = input;
+      } else if (input is Map<String, dynamic>) {
+        // Case 2: Input is a map of parameters
+        final licenseKey = input['licenseKey'] as String;
+        final email = input['email'] as String;
+        final type = input['type'] as LicenseType;
 
-      final license = License(
-        licenseKey: licenseKey,
-        licenseType: type,
-        activationDate: activationDate,
-        expiryDate: expiryDate,
-        features: features,
-        customerEmail: email,
-      );
+        if (!isValidKeyFormat(licenseKey)) {
+          throw Exception('Invalid license key format');
+        }
 
+        // Extract and validate the license type from the key
+        final keyPrefix = licenseKey.split('-')[0];
+        final keyType = switch (keyPrefix) {
+          'DEMO' => LicenseType.demo,
+          'PRO' => LicenseType.professional,
+          'ENT' => LicenseType.enterprise,
+          _ => throw Exception('Invalid license key prefix'),
+        };
+
+        if (keyType != type) {
+          throw Exception('License key prefix ($keyPrefix) does not match selected plan (${type.toString().split('.').last})');
+        }
+
+        final features = License.getDefaultFeatures(type);
+        final activationDate = DateTime.now();
+        final expiryDays = features['expiry_days'] as int? ?? 30;
+        final expiryDate = activationDate.add(Duration(days: expiryDays));
+
+        license = License(
+          licenseKey: licenseKey,
+          licenseType: type,
+          activationDate: activationDate,
+          expiryDate: expiryDate,
+          features: features,
+          customerEmail: email,
+        );
+      } else {
+        throw Exception('Invalid input type for license activation');
+      }
+
+      // Save to database
       await DatabaseHelper.instance.saveLicense(license);
+
+      // Schedule notifications if expiry date exists
+      if (license.expiryDate != null) {
+        await scheduleExpiryNotifications(license);
+      }
+
+      debugPrint('License activated successfully: ${license.licenseKey}');
       return license;
     } catch (e) {
       debugPrint('License activation error: $e');
-      rethrow; // Rethrow to let the provider handle the error
+      rethrow;
     }
   }
 

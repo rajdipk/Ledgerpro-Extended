@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../models/license_model.dart';
 import '../../providers/license_provider.dart';
 import '../../services/storage_service.dart';
 import '../../services/api_service.dart';
+import '../home_screen.dart';
 
 class LicenseActivationScreen extends StatefulWidget {
   const LicenseActivationScreen({super.key});
@@ -16,7 +18,8 @@ class LicenseActivationScreen extends StatefulWidget {
   State<LicenseActivationScreen> createState() => _LicenseActivationScreenState();
 }
 
-class _LicenseActivationScreenState extends State<LicenseActivationScreen> with SingleTickerProviderStateMixin {
+class _LicenseActivationScreenState extends State<LicenseActivationScreen> 
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _licenseKeyController = TextEditingController();
   final _emailController = TextEditingController();
@@ -93,12 +96,17 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
             throw Exception(verifyResult['error'] ?? 'Failed to verify license');
         }
 
-        // Then activate locally
+        // Extract license data from response
+        final licenseData = verifyResult['data']['license'];
+        final licenseType = _getLicenseTypeFromString(licenseData['type']);
+
+        // Activate license locally
         final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
         final success = await licenseProvider.activateLicense(
             licenseKey,
             email,
-            _selectedType,
+            licenseType,
+            licenseData: licenseData, // Pass the full license data
         );
 
         if (!mounted) return;
@@ -114,7 +122,11 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
                     backgroundColor: Colors.green,
                 ),
             );
-            Navigator.of(context).pop(true);
+
+            // Replace current screen with home screen
+            Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) =>  HomeScreen())
+            );
         } else {
             ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -139,6 +151,19 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
     }
   }
 
+  LicenseType _getLicenseTypeFromString(String type) {
+    switch (type.toLowerCase()) {
+        case 'demo':
+            return LicenseType.demo;
+        case 'professional':
+            return LicenseType.professional;
+        case 'enterprise':
+            return LicenseType.enterprise;
+        default:
+            throw Exception('Invalid license type: $type');
+    }
+  }
+
   Future<void> _launchWebsite() async {
     final uri = Uri.parse('https://rajdipk.github.io/Ledgerpro-Extended/');
     if (await canLaunchUrl(uri)) {
@@ -147,81 +172,55 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.teal[400],
-      body: Container(
-        decoration: BoxDecoration(
-          color: Colors.teal[400],
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 20),
-                  Center(
-                    child: AnimatedTextKit(
-                      animatedTexts: [
-                        TypewriterAnimatedText(
-                          'Choose Your Plan',
-                          textStyle: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          speed: const Duration(milliseconds: 100),
-                        ),
-                      ],
-                      totalRepeatCount: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextButton.icon(
-                    onPressed: _launchWebsite,
-                    icon: const Icon(Icons.info_outline, color: Colors.white),
-                    label: const Text(
-                      'View detailed features on our website',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildPlanCards(),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildLicenseDetailsCard(),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: _buildActivateButton(),
-                    ),
-                  ),
-                ],
-              ),
+  Widget build(BuildContext context) => Scaffold(
+        body: Container(
+            decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                        Colors.blue.shade900,
+                        Colors.teal.shade700,
+                    ],
+                ),
             ),
-          ),
+            child: SafeArea(
+                child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                    children: [
+                        _buildAnimatedHeader(),
+                        const SizedBox(height: 40),
+                        _buildPlanSelector(),
+                        const SizedBox(height: 40),
+                        _buildLicenseForm(),
+                        const SizedBox(height: 30),
+                        _buildActivationControls(),
+                    ],
+                ),
+            ),
         ),
+    );
+
+  Widget _buildAnimatedHeader() {
+    return Center(
+      child: AnimatedTextKit(
+        animatedTexts: [
+          TypewriterAnimatedText(
+            'Choose Your Plan',
+            textStyle: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            speed: const Duration(milliseconds: 100),
+          ),
+        ],
+        totalRepeatCount: 1,
       ),
     );
   }
 
-  Widget _buildPlanCards() {
+  Widget _buildPlanSelector() {
     return SizedBox(
       height: 400,
       child: Center(
@@ -375,7 +374,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
     );
   }
 
-  Widget _buildLicenseDetailsCard() {
+  Widget _buildLicenseForm() {
     return Card(
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -481,7 +480,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen> with 
     );
   }
 
-  Widget _buildActivateButton() {
+  Widget _buildActivationControls() {
     return ElevatedButton(
       onPressed: _isActivating ? null : _activateLicense,
       style: ElevatedButton.styleFrom(

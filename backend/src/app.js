@@ -32,33 +32,36 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS configuration
 const corsOptions = {
-    origin: '*',
+    origin: ['https://rajdipk.github.io', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'x-admin-token'],
+    allowedHeaders: ['Content-Type', 'Accept', 'x-admin-token', 'Authorization'],
     exposedHeaders: ['Content-Length', 'Content-Type'],
-    credentials: false,
+    credentials: true,
     maxAge: 86400 // 24 hours
 };
 
 app.use(cors(corsOptions));
 
-// Add OPTIONS handling for preflight requests
-app.options('*', cors(corsOptions));
+// Add preflight handlers for specific routes
+app.options('/api/admin/*', cors(corsOptions));
+app.options('/api/customers/*', cors(corsOptions));
 
 // Add specific handling for admin routes
-app.use('/api/admin/*', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, x-admin-token');
+app.use('/api/admin', (req, res, next) => {
+    res.header('Access-Control-Allow-Headers', 'x-admin-token, Content-Type, Accept');
     next();
 });
 
-// Update route-specific CORS handling
-app.use(['/api/customers/verify-license', '/api/customers/deactivate-license'], (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept');
-    next();
+// WebSocket upgrade handling
+server.on('upgrade', (request, socket, head) => {
+    const origin = request.headers.origin;
+    if (corsOptions.origin.includes(origin)) {
+        webSocketService.wss.handleUpgrade(request, socket, head, (ws) => {
+            webSocketService.wss.emit('connection', ws, request);
+        });
+    } else {
+        socket.destroy();
+    }
 });
 
 // Debug middleware to log all requests

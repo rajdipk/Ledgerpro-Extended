@@ -7,32 +7,50 @@ class WebSocketService {
     }
 
     initialize(server) {
-        this.wss = new WebSocket.Server({ server });
-        
-        this.wss.on('connection', (ws, req) => {
-            console.log('New WebSocket client connected');
-            
-            // Check if it's an admin connection
-            const isAdmin = req.headers['x-admin-token'] === process.env.ADMIN_TOKEN;
-            
-            if (isAdmin) {
-                this.adminClients.add(ws);
-                this.sendAdminUpdate(ws);
-            } else {
-                this.clients.add(ws);
-                this.sendPriceUpdate(ws);
+        this.wss = new WebSocket.Server({ 
+            server,
+            verifyClient: (info) => {
+                const token = info.req.headers['x-admin-token'];
+                console.log('WebSocket connection attempt:', {
+                    token: token,
+                    expected: process.env.ADMIN_TOKEN,
+                    origin: info.req.headers.origin
+                });
+                return token === process.env.ADMIN_TOKEN;
             }
-
-            ws.on('error', (error) => {
-                console.error('WebSocket error:', error);
-            });
-
-            ws.on('close', () => {
-                console.log('Client disconnected');
-                this.clients.delete(ws);
-                this.adminClients.delete(ws);
-            });
         });
+        
+        this.wss.on('connection', this.handleConnection.bind(this));
+    }
+
+    handleConnection(ws, req) {
+        console.log('New WebSocket connection:', {
+            origin: req.headers.origin,
+            token: req.headers['x-admin-token']
+        });
+
+        const isAdmin = req.headers['x-admin-token'] === process.env.ADMIN_TOKEN;
+        
+        if (isAdmin) {
+            this.adminClients.add(ws);
+            this.sendAdminUpdate(ws);
+        } else {
+            this.clients.add(ws);
+            this.sendPriceUpdate(ws);
+        }
+
+        ws.on('error', this.handleError.bind(this));
+        ws.on('close', () => this.handleClose(ws));
+    }
+
+    handleError(error) {
+        console.error('WebSocket error:', error);
+    }
+
+    handleClose(ws) {
+        console.log('Client disconnected');
+        this.clients.delete(ws);
+        this.adminClients.delete(ws);
     }
 
     broadcastMessage(message) {

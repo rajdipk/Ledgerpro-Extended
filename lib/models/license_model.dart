@@ -13,7 +13,7 @@ class License {
   final DateTime activationDate;
   final DateTime? expiryDate;
   final Map<String, dynamic> features;
-  final Map<String, dynamic> limits;  // Add this field
+  final Map<String, dynamic> limits; // Add this field
   final String? customerEmail;
 
   License({
@@ -23,7 +23,7 @@ class License {
     required this.activationDate,
     this.expiryDate,
     required this.features,
-    this.limits = const {},  // Add default value
+    this.limits = const {}, // Add default value
     this.customerEmail,
   });
 
@@ -61,7 +61,7 @@ class License {
           'api_access': false,
           'multi_business': false,
         };
-      
+
       case LicenseType.professional:
         return {
           'expiry_days': 30,
@@ -84,7 +84,7 @@ class License {
           'api_access': false,
           'multi_business': false,
         };
-      
+
       case LicenseType.enterprise:
         return {
           'expiry_days': 365,
@@ -118,7 +118,7 @@ class License {
       'activation_date': activationDate.toIso8601String(),
       'expiry_date': expiryDate?.toIso8601String(),
       'features': features,
-      'limits': limits,  // Add this field
+      'limits': limits, // Add this field
       'customer_email': customerEmail,
     };
   }
@@ -126,17 +126,26 @@ class License {
   factory License.fromMap(Map<String, dynamic> map) {
     return License(
       id: map['id'] as int?,
-      licenseKey: map['license_key'] as String,
+      licenseKey: map['license_key'] as String? ??
+          map['key'] as String, // Support both key formats
       licenseType: LicenseType.values.firstWhere(
-        (t) => t.toString() == map['license_type'],
+        (t) =>
+            t.toString().split('.').last.toLowerCase() ==
+            (map['license_type'] as String? ?? map['type'] as String)
+                .toLowerCase(),
       ),
-      activationDate: DateTime.parse(map['activation_date'] as String),
+      activationDate: map['activation_date'] != null
+          ? DateTime.parse(map['activation_date'] as String)
+          : DateTime.now(),
       expiryDate: map['expiry_date'] != null
           ? DateTime.parse(map['expiry_date'] as String)
-          : null,
-      features: Map<String, dynamic>.from(map['features'] as Map),
-      limits: Map<String, dynamic>.from(map['limits'] ?? {}),  // Add this field
-      customerEmail: map['customer_email'] as String?,
+          : map['endDate'] != null
+              ? DateTime.parse(map['endDate'] as String)
+              : null,
+      features: Map<String, dynamic>.from(map['features'] as Map? ?? {}),
+      limits: Map<String, dynamic>.from(map['limits'] ?? {}),
+      customerEmail:
+          map['customer_email'] as String? ?? map['customerEmail'] as String?,
     );
   }
 }

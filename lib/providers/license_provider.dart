@@ -5,18 +5,19 @@ import '../models/license_model.dart';
 import '../services/license_service.dart';
 import '../database/database_helper.dart';
 import '../services/storage_service.dart';
-import '../services/api_service.dart';  // Add this import
+import '../services/api_service.dart'; // Add this import
 
 class LicenseProvider with ChangeNotifier {
   License? _currentLicense;
   String? _error;
-  final ApiService _apiService = ApiService.instance;  // Add this field
+  final ApiService _apiService = ApiService.instance; // Add this field
 
   String? get customerId => _currentLicense?.id?.toString();
   String? get customerEmail => _currentLicense?.customerEmail;
   License? get currentLicense => _currentLicense;
   String? get error => _error;
-  bool get isLicensed => _currentLicense != null && !_currentLicense!.isExpired();
+  bool get isLicensed =>
+      _currentLicense != null && !_currentLicense!.isExpired();
 
   Future<void> loadLicense() async {
     try {
@@ -50,31 +51,40 @@ class LicenseProvider with ChangeNotifier {
   }) async {
     try {
       _error = null;
-      
+
       if (licenseKey.isEmpty || email.isEmpty) {
         _error = 'License key and email are required';
         notifyListeners();
         return false;
       }
 
+      debugPrint('Creating license with data: $licenseData');
+
+      // Get default features for the license type
+      final defaultFeatures = License.getDefaultFeatures(type);
+
       // Create license object from server data or defaults
       final license = License(
         licenseKey: licenseKey,
         licenseType: type,
         activationDate: DateTime.now(),
-        expiryDate: licenseData?['endDate'] != null ? 
-            DateTime.parse(licenseData!['endDate']) : null,
-        features: licenseData?['features'] ?? License.getDefaultFeatures(type),
-        limits: licenseData?['limits'] ?? {},  // Now this is properly defined
+        expiryDate: licenseData?['endDate'] != null
+            ? DateTime.parse(licenseData!['endDate'])
+            : null,
+        features: defaultFeatures, // Always use default features as base
+        limits: licenseData?['limits'] ?? {},
         customerEmail: email,
       );
 
+      debugPrint('Attempting to activate license: ${license.toMap()}');
+
       // Save license locally
-      final activatedLicense = await LicenseService.instance.activateLicense(license);
+      final activatedLicense =
+          await LicenseService.instance.activateLicense(license);
       if (activatedLicense == null) {
         throw Exception('Failed to activate license');
       }
-      
+
       _currentLicense = activatedLicense;
       notifyListeners();
       return true;
@@ -89,7 +99,7 @@ class LicenseProvider with ChangeNotifier {
   Future<bool> deactivateLicense() async {
     try {
       _error = null;
-      
+
       final currentLicense = _currentLicense;
       if (currentLicense == null) {
         return true; // Already deactivated
@@ -113,10 +123,10 @@ class LicenseProvider with ChangeNotifier {
       await LicenseService.instance.deactivateLicense();
       await StorageService.instance.removeValue('license_email');
       await StorageService.instance.removeValue('license_key');
-      
+
       _currentLicense = null;
       notifyListeners();
-      
+
       return true;
     } catch (e) {
       debugPrint('License deactivation error: $e');
@@ -147,7 +157,7 @@ class LicenseProvider with ChangeNotifier {
   Future<bool> isWithinLimit(String limitName, int currentCount) async {
     if (_currentLicense == null) return false;
     if (_currentLicense!.isExpired()) return false;
-    
+
     final limit = _currentLicense!.getFeatureLimit(limitName);
     if (limit == null || limit < 0) return true; // No limit or unlimited
     return currentCount < limit;

@@ -28,13 +28,13 @@ android {
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
         coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'  // Update to match Java version
     }
 
     sourceSets {
@@ -62,15 +62,24 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22"  // Update Kotlin stdlib version
+    implementation 'androidx.annotation:annotation:1.7.0'  // Add specific annotation version
     implementation 'androidx.appcompat:appcompat:1.6.1'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.2.2'  // Updated version
 }
 
 configurations.all {
-    resolutionStrategy.eachDependency { details ->
-        if (details.requested.group == 'org.jetbrains.kotlin') {
-            details.useVersion '1.8.22' // Force the use of Kotlin version 1.8.22
+    resolutionStrategy {
+        eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                details.useVersion '1.7.22'  // Force consistent Kotlin version
+            }
+            if (details.requested.group == 'androidx.annotation') {
+                details.useVersion '1.7.0'  // Force consistent annotation version
+            }
         }
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'
     }
 }

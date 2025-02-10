@@ -20,7 +20,8 @@ class HomeScreenDesign extends StatefulWidget {
   State<HomeScreenDesign> createState() => _HomeScreenDesignState();
 }
 
-class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerProviderStateMixin {
+class _HomeScreenDesignState extends State<HomeScreenDesign>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _businessNameController = TextEditingController();
   final FocusNode _businessNameFocusNode = FocusNode();
@@ -40,8 +41,9 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    
+    _tabController =
+        TabController(length: 3, vsync: this); // Updated length to 3
+
     // Listen to transaction changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _businessProvider?.addListener(_onBusinessDataChanged);
@@ -115,7 +117,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -139,6 +142,14 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     final businessProvider = Provider.of<BusinessProvider>(context);
     final selectedBusinessId = businessProvider.selectedBusinessId;
 
+    // Find the selected business safely
+    final selectedBusiness = selectedBusinessId != null
+        ? businessProvider.businesses.firstWhere(
+            (b) => b.id == selectedBusinessId,
+            orElse: () => Business(id: "", name: "Unknown Business"),
+          )
+        : Business(id: "", name: "No Business Selected");
+
     return Scaffold(
       body: selectedBusinessId == null
           ? _buildNoBusinessSelectedMessage()
@@ -154,7 +165,7 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                           children: [
                             Expanded(
                               child: Text(
-                                'Overview for ${businessProvider.businesses.firstWhere((b) => b.id == businessProvider.selectedBusinessId, orElse: () => Business(id: "", name: "")).name}',
+                                'Overview for ${selectedBusiness.name}',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -179,6 +190,10 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                               icon: Icon(Icons.local_shipping_outlined),
                               text: 'Suppliers',
                             ),
+                            Tab(
+                              icon: Icon(Icons.receipt_long_outlined),
+                              text: 'Transactions',
+                            ),
                           ],
                         ),
                       ],
@@ -199,6 +214,11 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                           context,
                           businessProvider,
                           isCustomer: false,
+                        ),
+                        // Transactions Tab
+                        _buildAllTransactionsContent(
+                          context,
+                          businessProvider,
                         ),
                       ],
                     ),
@@ -230,8 +250,10 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     return formatter.format(value);
   }
 
-  Widget _buildBalanceCard(String title, double amount, Color color, IconData icon, BuildContext context) {
-    final currencySymbol = Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+  Widget _buildBalanceCard(String title, double amount, Color color,
+      IconData icon, BuildContext context) {
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -292,13 +314,16 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      title == 'Receivable' ? 'You will receive' : 'You have to pay',
+                      title == 'Receivable'
+                          ? 'You will receive'
+                          : 'You have to pay',
                       style: TextStyle(
                         color: color,
                         fontSize: 12,
@@ -315,10 +340,12 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildBalanceOverviewChart(List<Map<String, dynamic>> balances, BuildContext context) {
+  Widget _buildBalanceOverviewChart(
+      List<Map<String, dynamic>> balances, BuildContext context) {
     // Parse String dates to DateTime, sort, and take the last 30 days
     final sortedBalances = balances.take(30).toList();
-    final currencySymbol = Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
 
     return Card(
       elevation: 4,
@@ -403,10 +430,13 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                         interval: 1,
                         getTitlesWidget: (value, meta) {
                           final int index = value.toInt();
-                          if (index < 0 || index >= sortedBalances.length || index % 5 != 0) {
+                          if (index < 0 ||
+                              index >= sortedBalances.length ||
+                              index % 5 != 0) {
                             return const Text('');
                           }
-                          final date = DateTime.parse(sortedBalances[index]['date'] as String);
+                          final date = DateTime.parse(
+                              sortedBalances[index]['date'] as String);
                           return SideTitleWidget(
                             axisSide: meta.axisSide,
                             child: Text(
@@ -437,14 +467,24 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                   ),
                   minX: 0,
                   maxX: (sortedBalances.length - 1).toDouble(),
-                  minY: sortedBalances.map((b) => min(
-                    (b['receivable_balance'] as num?)?.toDouble() ?? 0.0,
-                    (b['payable_balance'] as num?)?.toDouble() ?? 0.0,
-                  )).reduce(min) - 1000,
-                  maxY: sortedBalances.map((b) => max(
-                    (b['receivable_balance'] as num?)?.toDouble() ?? 0.0,
-                    (b['payable_balance'] as num?)?.toDouble() ?? 0.0,
-                  )).reduce(max) + 1000,
+                  minY: sortedBalances
+                          .map((b) => min(
+                                (b['receivable_balance'] as num?)?.toDouble() ??
+                                    0.0,
+                                (b['payable_balance'] as num?)?.toDouble() ??
+                                    0.0,
+                              ))
+                          .reduce(min) -
+                      1000,
+                  maxY: sortedBalances
+                          .map((b) => max(
+                                (b['receivable_balance'] as num?)?.toDouble() ??
+                                    0.0,
+                                (b['payable_balance'] as num?)?.toDouble() ??
+                                    0.0,
+                              ))
+                          .reduce(max) +
+                      1000,
                   lineTouchData: LineTouchData(
                     enabled: true,
                     touchTooltipData: LineTouchTooltipData(
@@ -456,7 +496,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                       getTooltipItems: (List<LineBarSpot> touchedSpots) {
                         return touchedSpots.map((LineBarSpot touchedSpot) {
                           final date = DateTime.parse(
-                            sortedBalances[touchedSpot.x.toInt()]['date'] as String,
+                            sortedBalances[touchedSpot.x.toInt()]['date']
+                                as String,
                           );
                           return LineTooltipItem(
                             '${date.day}/${date.month}\n$currencySymbol${_formatNumber(touchedSpot.y)}',
@@ -477,7 +518,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                         var balance = entry.value;
                         return FlSpot(
                           index.toDouble(),
-                          (balance['receivable_balance'] as num?)?.toDouble() ?? 0.0,
+                          (balance['receivable_balance'] as num?)?.toDouble() ??
+                              0.0,
                         );
                       }).toList(),
                       isCurved: true,
@@ -514,7 +556,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                         var balance = entry.value;
                         return FlSpot(
                           index.toDouble(),
-                          (balance['payable_balance'] as num?)?.toDouble() ?? 0.0,
+                          (balance['payable_balance'] as num?)?.toDouble() ??
+                              0.0,
                         );
                       }).toList(),
                       isCurved: true,
@@ -555,13 +598,15 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildColorCodedBalances(
-      BuildContext context, List<Map<String, dynamic>> balances, int businessId) {
+  Widget _buildColorCodedBalances(BuildContext context,
+      List<Map<String, dynamic>> balances, int businessId) {
     if (balances.isEmpty) return const SizedBox();
-    
+
     final latestBalance = balances.first;
-    final receivableBalance = (latestBalance['receivable_balance'] as num?)?.toDouble() ?? 0.0;
-    final payableBalance = (latestBalance['payable_balance'] as num?)?.toDouble() ?? 0.0;
+    final receivableBalance =
+        (latestBalance['receivable_balance'] as num?)?.toDouble() ?? 0.0;
+    final payableBalance =
+        (latestBalance['payable_balance'] as num?)?.toDouble() ?? 0.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -582,8 +627,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
               Expanded(
                 child: _buildBalanceCard(
                   'Receivable',
-                  -receivableBalance,  // Negate because receivables are stored as negative
-                  const Color(0xFFFF7675),  // Red for money to receive
+                  -receivableBalance, // Negate because receivables are stored as negative
+                  const Color(0xFFFF7675), // Red for money to receive
                   Icons.arrow_downward,
                   context,
                 ),
@@ -591,8 +636,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
               Expanded(
                 child: _buildBalanceCard(
                   'Payable',
-                  payableBalance,  // Keep positive as payables are stored as positive
-                  const Color(0xFF00B894),  // Teal for money to pay
+                  payableBalance, // Keep positive as payables are stored as positive
+                  const Color(0xFF00B894), // Teal for money to pay
                   Icons.arrow_upward,
                   context,
                 ),
@@ -604,12 +649,14 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildTotalTransactionsSummary(BuildContext context, int selectedBusinessId) {
+  Widget _buildTotalTransactionsSummary(
+      BuildContext context, int selectedBusinessId) {
     final now = DateTime.now();
     final formattedDate = DateFormat('yyyy-MM-dd').format(now);
     final currentMonth = now.month;
     final currentYear = now.year;
-    final currencySymbol = Provider.of<CurrencyProvider>(context).currencySymbol;
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context).currencySymbol;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -687,7 +734,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
 
                           return Column(
                             children: [
-                              _buildSummaryRow('Type', 'Today', 'This Week', 'This Month',
+                              _buildSummaryRow(
+                                  'Type', 'Today', 'This Week', 'This Month',
                                   isHeader: true),
                               const Divider(height: 1),
                               _buildSummaryRow(
@@ -781,7 +829,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildCustomerOverviewSection(BuildContext context, BusinessProvider businessProvider) {
+  Widget _buildCustomerOverviewSection(
+      BuildContext context, BusinessProvider businessProvider) {
     return ValueListenableBuilder(
       valueListenable: _customerOverviewNotifier,
       builder: (context, value, child) {
@@ -807,7 +856,7 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                 ),
               );
             }
-            
+
             return Column(
               children: [
                 Card(
@@ -862,7 +911,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildSupplierOverviewSection(BuildContext context, BusinessProvider businessProvider) {
+  Widget _buildSupplierOverviewSection(
+      BuildContext context, BusinessProvider businessProvider) {
     return ValueListenableBuilder(
       valueListenable: _supplierOverviewNotifier,
       builder: (context, value, child) {
@@ -888,7 +938,7 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                 ),
               );
             }
-            
+
             return Column(
               children: [
                 Card(
@@ -910,7 +960,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _buildSupplierBalanceOverviewChart(snapshot.data!, context),
+                        _buildSupplierBalanceOverviewChart(
+                            snapshot.data!, context),
                         const SizedBox(height: 16),
                         _buildSupplierColorCodedBalances(
                           context,
@@ -943,10 +994,12 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildSupplierBalanceOverviewChart(List<Map<String, dynamic>> balances, BuildContext context) {
+  Widget _buildSupplierBalanceOverviewChart(
+      List<Map<String, dynamic>> balances, BuildContext context) {
     // Parse String dates to DateTime, sort, and take the last 30 days
     final sortedBalances = balances.take(30).toList();
-    final currencySymbol = Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
 
     return Card(
       elevation: 4,
@@ -1034,7 +1087,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                         getTitlesWidget: (value, meta) {
                           final index = value.toInt();
                           if (index >= 0 && index < sortedBalances.length) {
-                            final date = DateTime.parse(sortedBalances[index]['date']);
+                            final date =
+                                DateTime.parse(sortedBalances[index]['date']);
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
@@ -1062,14 +1116,16 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                   maxX: (sortedBalances.length - 1).toDouble(),
                   minY: sortedBalances
                       .map((b) => [
-                            (b['receivable_balance'] as num?)?.toDouble() ?? 0.0,
+                            (b['receivable_balance'] as num?)?.toDouble() ??
+                                0.0,
                             (b['payable_balance'] as num?)?.toDouble() ?? 0.0,
                           ])
                       .expand((e) => e)
                       .reduce(min),
                   maxY: sortedBalances
                       .map((b) => [
-                            (b['receivable_balance'] as num?)?.toDouble() ?? 0.0,
+                            (b['receivable_balance'] as num?)?.toDouble() ??
+                                0.0,
                             (b['payable_balance'] as num?)?.toDouble() ?? 0.0,
                           ])
                       .expand((e) => e)
@@ -1081,7 +1137,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                         var balance = entry.value;
                         return FlSpot(
                           index.toDouble(),
-                          (balance['receivable_balance'] as num?)?.toDouble() ?? 0.0,
+                          (balance['receivable_balance'] as num?)?.toDouble() ??
+                              0.0,
                         );
                       }).toList(),
                       isCurved: true,
@@ -1118,7 +1175,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
                         var balance = entry.value;
                         return FlSpot(
                           index.toDouble(),
-                          (balance['payable_balance'] as num?)?.toDouble() ?? 0.0,
+                          (balance['payable_balance'] as num?)?.toDouble() ??
+                              0.0,
                         );
                       }).toList(),
                       isCurved: true,
@@ -1159,13 +1217,15 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildSupplierColorCodedBalances(
-      BuildContext context, List<Map<String, dynamic>> balances, int businessId) {
+  Widget _buildSupplierColorCodedBalances(BuildContext context,
+      List<Map<String, dynamic>> balances, int businessId) {
     if (balances.isEmpty) return const SizedBox();
-    
+
     final latestBalance = balances.first;
-    final receivableBalance = (latestBalance['receivable_balance'] as num?)?.toDouble() ?? 0.0;
-    final payableBalance = (latestBalance['payable_balance'] as num?)?.toDouble() ?? 0.0;
+    final receivableBalance =
+        (latestBalance['receivable_balance'] as num?)?.toDouble() ?? 0.0;
+    final payableBalance =
+        (latestBalance['payable_balance'] as num?)?.toDouble() ?? 0.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1186,8 +1246,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
               Expanded(
                 child: _buildBalanceCard(
                   'Receivable',
-                  -receivableBalance,  // Negate because receivables are stored as negative
-                  const Color(0xFFFF7675),  // Red for money to receive
+                  -receivableBalance, // Negate because receivables are stored as negative
+                  const Color(0xFFFF7675), // Red for money to receive
                   Icons.arrow_downward,
                   context,
                 ),
@@ -1195,8 +1255,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
               Expanded(
                 child: _buildBalanceCard(
                   'Payable',
-                  payableBalance,  // Keep positive as payables are stored as positive
-                  const Color(0xFF00B894),  // Teal for money to pay
+                  payableBalance, // Keep positive as payables are stored as positive
+                  const Color(0xFF00B894), // Teal for money to pay
                   Icons.arrow_upward,
                   context,
                 ),
@@ -1208,12 +1268,14 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
     );
   }
 
-  Widget _buildSupplierTransactionsSummary(BuildContext context, int selectedBusinessId) {
+  Widget _buildSupplierTransactionsSummary(
+      BuildContext context, int selectedBusinessId) {
     final now = DateTime.now();
     final formattedDate = DateFormat('yyyy-MM-dd').format(now);
     final currentMonth = now.month;
     final currentYear = now.year;
-    final currencySymbol = Provider.of<CurrencyProvider>(context).currencySymbol;
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context).currencySymbol;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1245,12 +1307,14 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: FutureBuilder<Map<String, double>>(
-                future: DatabaseHelper.instance.getSupplierTotalTransactionsForDay(
-                    selectedBusinessId, formattedDate),
+                future: DatabaseHelper.instance
+                    .getSupplierTotalTransactionsForDay(
+                        selectedBusinessId, formattedDate),
                 builder: (context, daySnapshot) {
                   return FutureBuilder<Map<String, double>>(
                     future: DatabaseHelper.instance
-                        .getSupplierTotalTransactionsForWeek(selectedBusinessId),
+                        .getSupplierTotalTransactionsForWeek(
+                            selectedBusinessId),
                     builder: (context, weekSnapshot) {
                       return FutureBuilder<Map<String, double>>(
                         future: DatabaseHelper.instance
@@ -1291,7 +1355,8 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
 
                           return Column(
                             children: [
-                              _buildSummaryRow('Type', 'Today', 'This Week', 'This Month',
+                              _buildSummaryRow(
+                                  'Type', 'Today', 'This Week', 'This Month',
                                   isHeader: true),
                               const Divider(height: 1),
                               _buildSummaryRow(
@@ -1332,6 +1397,382 @@ class _HomeScreenDesignState extends State<HomeScreenDesign> with SingleTickerPr
       ),
     );
   }
+
+  Widget _buildAllTransactionsContent(
+    BuildContext context,
+    BusinessProvider businessProvider,
+  ) {
+    if (businessProvider.selectedBusinessId == null) {
+      return const Center(child: Text('No business selected'));
+    }
+
+    final businessId = int.parse(businessProvider.selectedBusinessId!);
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+
+    return Container(
+      color: const Color(0xFFF5F6FA),
+      child: Column(
+        children: [
+          // Transaction stats card
+          _buildTransactionStats(businessId),
+
+          // Transaction totals card
+          _buildTransactionTotals(businessId),
+
+          // Transactions list
+          Expanded(
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future:
+                  DatabaseHelper.instance.getCombinedTransactions(businessId),
+              builder: (context, snapshot) {
+                debugPrint(
+                    'Transaction loading state: ${snapshot.connectionState}');
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  debugPrint('Error loading transactions: ${snapshot.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline,
+                            size: 48, color: Colors.red[300]),
+                        const SizedBox(height: 16),
+                        Text('Error: ${snapshot.error}'),
+                      ],
+                    ),
+                  );
+                }
+
+                final transactions = snapshot.data ?? [];
+                debugPrint('Loaded ${transactions.length} transactions');
+
+                if (transactions.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.receipt_long_outlined,
+                            size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No transactions yet',
+                          style:
+                              TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: transactions.length,
+                  itemBuilder: (context, index) {
+                    final transaction = transactions[index];
+
+                    // Debug logging for each transaction
+                    debugPrint('Rendering transaction: $transaction');
+
+                    // Safely handle numeric conversions
+                    final amount = transaction['amount'] is String
+                        ? double.tryParse(transaction['amount']) ?? 0.0
+                        : (transaction['amount'] ?? 0.0).toDouble();
+
+                    final isCustomer =
+                        transaction['transaction_type'] == 'customer';
+                    final isReceived = amount >= 0;
+
+                    final name = isCustomer
+                        ? transaction['customer_name'] ?? 'Unknown Customer'
+                        : transaction['supplier_name'] ?? 'Unknown Supplier';
+
+                    final date = DateTime.parse(transaction['date'].toString());
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isCustomer
+                              ? Colors.blue.withOpacity(0.1)
+                              : Colors.orange.withOpacity(0.1),
+                          child: Icon(
+                            isCustomer ? Icons.person : Icons.local_shipping,
+                            color: isCustomer ? Colors.blue : Colors.orange,
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          DateFormat('MMM dd, yyyy hh:mm a').format(date),
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '$currencySymbol${amount.abs().toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: isReceived ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              isReceived ? 'Received' : 'Given',
+                              style: TextStyle(
+                                color: isReceived ? Colors.green : Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionStats(int businessId) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: DatabaseHelper.instance.getTransactionStats(businessId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        final stats = snapshot.data!;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem(
+                  'Total',
+                  stats['total_count']?.toString() ?? '0',
+                  Icons.receipt_long,
+                ),
+                _buildStatItem(
+                  'Customer',
+                  stats['customer_count']?.toString() ?? '0',
+                  Icons.people,
+                ),
+                _buildStatItem(
+                  'Supplier',
+                  stats['supplier_count']?.toString() ?? '0',
+                  Icons.local_shipping,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.teal),
+        const SizedBox(height: 8),
+        Text(value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(color: Colors.grey[600])),
+      ],
+    );
+  }
+
+  Widget _buildDateRangeFilter() {
+    // Implement your date range filter widget here
+    return Container();
+  }
+
+  Widget _buildTotalItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey[600])),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionTotals(int businessId) {
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+
+    return FutureBuilder<Map<String, double>>(
+      future: DatabaseHelper.instance.getTransactionTotals(businessId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        final totals = snapshot.data!;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildTotalItem(
+                  'Total Outgoing',
+                  '$currencySymbol${_formatNumber(totals['total_outgoing'] ?? 0)}',
+                  Colors.red,
+                ),
+                _buildTotalItem(
+                  'Total Incoming',
+                  '$currencySymbol${_formatNumber(totals['total_incoming'] ?? 0)}',
+                  Colors.green,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCombinedTransactionsList(
+    BuildContext context,
+    BusinessProvider businessProvider,
+  ) {
+    if (businessProvider.selectedBusinessId == null) {
+      return const Center(child: Text('No business selected'));
+    }
+
+    final currencySymbol =
+        Provider.of<CurrencyProvider>(context, listen: false).currencySymbol;
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: DatabaseHelper.instance.getCombinedTransactions(
+        int.parse(businessProvider.selectedBusinessId!),
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final transactions = snapshot.data ?? [];
+
+        if (transactions.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No transactions yet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: transactions.length,
+          itemBuilder: (context, index) {
+            final transaction = transactions[index];
+            final isReceived = transaction['amount'] > 0;
+            final isCustomer = transaction['customer_id'] != null;
+            final name = isCustomer
+                ? transaction['customer_name'] ?? 'Unknown Customer'
+                : transaction['supplier_name'] ?? 'Unknown Supplier';
+            final date = DateTime.parse(transaction['date']);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                leading: CircleAvatar(
+                  backgroundColor: isCustomer
+                      ? Colors.blue.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
+                  child: Icon(
+                    isCustomer ? Icons.person : Icons.local_shipping,
+                    color: isCustomer ? Colors.blue : Colors.orange,
+                  ),
+                ),
+                title: Text(
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  DateFormat('MMM dd, yyyy hh:mm a').format(date),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '$currencySymbol${transaction['amount'].abs().toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: isReceived ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      isReceived ? 'Received' : 'Given',
+                      style: TextStyle(
+                        color: isReceived ? Colors.green : Colors.red,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 // ignore: unused_element
@@ -1346,7 +1787,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: _tabBar,

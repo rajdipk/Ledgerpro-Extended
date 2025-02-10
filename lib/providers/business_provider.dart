@@ -33,9 +33,11 @@ class BusinessProvider with ChangeNotifier {
   List<FlSpot> get dailyBalances => _dailyBalances;
   bool get isPasswordValid => _isPasswordValid;
   String? get selectedBusinessId {
-    debugPrint('BusinessProvider - Getting selected business ID: $_selectedBusinessId');
+    debugPrint(
+        'BusinessProvider - Getting selected business ID: $_selectedBusinessId');
     return _selectedBusinessId;
   }
+
   Customer? get selectedCustomer => _selectedCustomer;
   Supplier? get selectedSupplier => _selectedSupplier;
 
@@ -85,19 +87,20 @@ class BusinessProvider with ChangeNotifier {
       createdAt: now.toIso8601String(),
       updatedAt: now.toIso8601String(),
     );
-    final int newBusinessId = await DatabaseHelper.instance.addBusiness(business.toMap());
-    
+    final int newBusinessId =
+        await DatabaseHelper.instance.addBusiness(business.toMap());
+
     // Set the newly added business as selected
     _selectedBusinessId = newBusinessId.toString();
-    
+
     // Refresh the business list
     await loadBusinessesFromDb();
-    
+
     // Load counts and balances for the new business
     await loadCustomerCount();
     await loadSupplierCount();
     await calculateBalances();
-    
+
     notifyListeners();
   }
 
@@ -121,12 +124,38 @@ class BusinessProvider with ChangeNotifier {
   void setSelectedBusinessId(String? businessId) {
     _selectedBusinessId = businessId;
     if (businessId != null) {
-      loadCustomerCount();
-      refreshSuppliers(); // Load supplier count when business is selected
-      calculateBalances(); // Calculate balances when a business is selected
-    } else {
+      // Clear selected customer and supplier when switching business
+      _selectedCustomer = null;
+      _selectedSupplier = null;
+      _selectedCustomerBalance = 0.0;
+      _selectedSupplierBalance = 0.0;
+
+      // Reset balances
+      _customerReceivableBalance = 0.0;
+      _customerPayableBalance = 0.0;
+      _supplierReceivableBalance = 0.0;
+      _supplierPayableBalance = 0.0;
+
+      // Reset counts
       customerCount = 0;
       supplierCount = 0;
+
+      // Load new data
+      loadCustomerCount();
+      refreshSuppliers();
+      calculateBalances();
+    } else {
+      // Reset everything when no business is selected
+      _selectedCustomer = null;
+      _selectedSupplier = null;
+      customerCount = 0;
+      supplierCount = 0;
+      _customerReceivableBalance = 0.0;
+      _customerPayableBalance = 0.0;
+      _supplierReceivableBalance = 0.0;
+      _supplierPayableBalance = 0.0;
+      _selectedCustomerBalance = 0.0;
+      _selectedSupplierBalance = 0.0;
     }
     notifyListeners();
   }
@@ -168,12 +197,26 @@ class BusinessProvider with ChangeNotifier {
   }
 
   Future<void> setSelectedCustomerById(int customerId) async {
-    final customers = await DatabaseHelper.instance
-        .getCustomers(int.parse(_selectedBusinessId ?? '0'));
-    _selectedCustomer = customers
-        .map((map) => Customer.fromMap(map))
-        .firstWhere((c) => c.id == customerId);
-    notifyListeners();
+    try {
+      if (_selectedBusinessId == null) return;
+
+      final customers = await DatabaseHelper.instance
+          .getCustomers(int.parse(_selectedBusinessId!));
+
+      final customerMap = customers.firstWhere(
+        (map) => map['id'] == customerId,
+        orElse: () => throw Exception('Customer not found'),
+      );
+
+      _selectedCustomer = Customer.fromMap(customerMap);
+      _selectedCustomerBalance = _selectedCustomer!.balance;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error setting selected customer: $e');
+      _selectedCustomer = null;
+      _selectedCustomerBalance = 0.0;
+      notifyListeners();
+    }
   }
 
   void setSelectedSupplier(Supplier? supplier) {
@@ -207,6 +250,10 @@ class BusinessProvider with ChangeNotifier {
   // Method to add a transaction and update balance
   Future<void> addTransaction(
       int customerId, double amount, String date) async {
+    if (_selectedBusinessId == null) {
+      throw Exception('No business selected');
+    }
+
     // Fetch the last transaction balance for the customer
     double lastBalance =
         await DatabaseHelper.instance.getLastTransactionBalance(customerId) ??
@@ -219,6 +266,7 @@ class BusinessProvider with ChangeNotifier {
     await DatabaseHelper.instance.addTransaction(
       Transaction(
         customerId: customerId,
+        businessId: int.parse(_selectedBusinessId!),
         amount: amount,
         date: date,
         balance: newBalance,
@@ -387,9 +435,13 @@ class BusinessProvider with ChangeNotifier {
     if (_selectedSupplier == null) {
       throw Exception('No supplier selected');
     }
+    if (_selectedBusinessId == null) {
+      throw Exception('No business selected');
+    }
 
     final transaction = Transaction(
       supplierId: _selectedSupplier!.id,
+      businessId: int.parse(_selectedBusinessId!),
       amount: -amount.abs(), // Payment is negative (money going out)
       date: date,
       balance: 0, // This will be calculated in addSupplierTransaction
@@ -404,9 +456,13 @@ class BusinessProvider with ChangeNotifier {
     if (_selectedSupplier == null) {
       throw Exception('No supplier selected');
     }
+    if (_selectedBusinessId == null) {
+      throw Exception('No business selected');
+    }
 
     final transaction = Transaction(
       supplierId: _selectedSupplier!.id,
+      businessId: int.parse(_selectedBusinessId!),
       amount: amount.abs(), // Receipt is positive (money coming in)
       date: date,
       balance: 0, // This will be calculated in addSupplierTransaction
@@ -473,6 +529,8 @@ class BusinessProvider with ChangeNotifier {
   //Method to calculate and update the customer balances for the Dashboards
   Future<void> calculateBalances() async {
     if (_selectedBusinessId != null) {
+      debugPrint('Calculating balances for business: $_selectedBusinessId');
+
       // Calculate customer balances
       final customers = await DatabaseHelper.instance
           .getCustomers(int.parse(_selectedBusinessId!));
@@ -489,6 +547,9 @@ class BusinessProvider with ChangeNotifier {
         }
       }
 
+      debugPrint('Customer Receivable: $customerReceivable');
+      debugPrint('Customer Payable: $customerPayable');
+
       // Calculate supplier balances
       final suppliers = await DatabaseHelper.instance
           .getSuppliers(int.parse(_selectedBusinessId!));
@@ -498,6 +559,8 @@ class BusinessProvider with ChangeNotifier {
       for (var supplier in suppliers) {
         final supplierOps = SupplierOperations(DatabaseHelper.instance);
         double balance = await supplierOps.getSupplierBalance(supplier['id']);
+        debugPrint('Supplier ${supplier['name']} balance: $balance');
+
         if (balance < 0) {
           supplierReceivable += balance.abs();
         } else {
@@ -505,14 +568,27 @@ class BusinessProvider with ChangeNotifier {
         }
       }
 
+      debugPrint('Supplier Receivable: $supplierReceivable');
+      debugPrint('Supplier Payable: $supplierPayable');
+
       _customerReceivableBalance = customerReceivable;
       _customerPayableBalance = customerPayable;
       _supplierReceivableBalance = supplierReceivable;
       _supplierPayableBalance = supplierPayable;
 
       // Store the calculated balances in customer_balances table
-      await DatabaseHelper.instance.calculateAndUpdateCustomerBalances(
+      await DatabaseHelper.instance.upsertCustomerBalances(
         int.parse(_selectedBusinessId!),
+        DateTime.now().toIso8601String().split('T')[0],
+        customerReceivable,
+        customerPayable,
+      );
+
+      // Store supplier balances
+      await DatabaseHelper.instance.upsertSupplierBalances(
+        int.parse(_selectedBusinessId!),
+        DateTime.now().toIso8601String().split('T')[0],
+        supplierPayable,
       );
 
       notifyListeners();

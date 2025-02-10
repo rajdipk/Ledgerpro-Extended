@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../models/license_model.dart';
 import '../../providers/license_provider.dart';
 import '../../services/storage_service.dart';
@@ -15,10 +14,11 @@ class LicenseActivationScreen extends StatefulWidget {
   const LicenseActivationScreen({super.key});
 
   @override
-  State<LicenseActivationScreen> createState() => _LicenseActivationScreenState();
+  State<LicenseActivationScreen> createState() =>
+      _LicenseActivationScreenState();
 }
 
-class _LicenseActivationScreenState extends State<LicenseActivationScreen> 
+class _LicenseActivationScreenState extends State<LicenseActivationScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _licenseKeyController = TextEditingController();
@@ -75,92 +75,93 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
     setState(() => _isActivating = true);
 
     try {
-        final licenseKey = _licenseKeyController.text.trim();
-        final email = _emailController.text.trim();
+      final licenseKey = _licenseKeyController.text.trim();
+      final email = _emailController.text.trim();
 
-        debugPrint('Attempting to verify license: $licenseKey for email: $email');
+      debugPrint('Attempting to verify license: $licenseKey for email: $email');
 
-        // First verify the license with backend
-        final verifyResult = await ApiService.instance.apiCall(
-            '/api/customers/verify-license',  // Changed from /api/admin/verify-license
-            method: 'POST',
-            body: {
-                'licenseKey': licenseKey,
-                'email': email,
-            },
-        );
+      // First verify the license with backend
+      final verifyResult = await ApiService.instance.apiCall(
+        '/api/customers/verify-license', // Changed from /api/admin/verify-license
+        method: 'POST',
+        body: {
+          'licenseKey': licenseKey,
+          'email': email,
+        },
+      );
 
-        debugPrint('Verify result: $verifyResult');
+      debugPrint('Verify result: $verifyResult');
 
-        if (!verifyResult['success']) {
-            throw Exception(verifyResult['error'] ?? 'Failed to verify license');
-        }
+      if (!verifyResult['success']) {
+        throw Exception(verifyResult['error'] ?? 'Failed to verify license');
+      }
 
-        // Extract license data from response
-        final licenseData = verifyResult['data']['license'];
-        final licenseType = _getLicenseTypeFromString(licenseData['type']);
+      // Extract license data from response
+      final licenseData = verifyResult['data']['license'];
+      final licenseType = _getLicenseTypeFromString(licenseData['type']);
 
-        // Activate license locally
-        final licenseProvider = Provider.of<LicenseProvider>(context, listen: false);
-        final success = await licenseProvider.activateLicense(
-            licenseKey,
-            email,
-            licenseType,
-            licenseData: licenseData, // Pass the full license data
-        );
+      // Activate license locally
+      final licenseProvider =
+          Provider.of<LicenseProvider>(context, listen: false);
+      final success = await licenseProvider.activateLicense(
+        licenseKey,
+        email,
+        licenseType,
+        licenseData: licenseData, // Pass the full license data
+      );
 
-        if (!mounted) return;
+      if (!mounted) return;
 
-        if (success) {
-            // Save the verified credentials
-            await StorageService.instance.saveValue('license_email', email);
-            await StorageService.instance.saveValue('license_key', licenseKey);
+      if (success) {
+        // Save the verified credentials
+        await StorageService.instance.saveValue('license_email', email);
+        await StorageService.instance.saveValue('license_key', licenseKey);
 
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('License activated successfully!'),
-                    backgroundColor: Colors.green,
-                ),
-            );
-
-            // Replace current screen with home screen
-            Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) =>  HomeScreen())
-            );
-        } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text(licenseProvider.error ?? 'Failed to activate license'),
-                    backgroundColor: Colors.red,
-                ),
-            );
-        }
-    } catch (e) {
-        debugPrint('License activation error details: $e');
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Error activating license: ${e.toString()}'),
-                backgroundColor: Colors.red,
-            ),
+          const SnackBar(
+            content: Text('License activated successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
+
+        // Replace current screen with home screen
+        Navigator.of(context)
+            .pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen()));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(licenseProvider.error ?? 'Failed to activate license'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('License activation error details: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error activating license: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-        if (mounted) {
-            setState(() => _isActivating = false);
-        }
+      if (mounted) {
+        setState(() => _isActivating = false);
+      }
     }
   }
 
   LicenseType _getLicenseTypeFromString(String type) {
     switch (type.toLowerCase()) {
-        case 'demo':
-            return LicenseType.demo;
-        case 'professional':
-            return LicenseType.professional;
-        case 'enterprise':
-            return LicenseType.enterprise;
-        default:
-            throw Exception('Invalid license type: $type');
+      case 'demo':
+        return LicenseType.demo;
+      case 'professional':
+        return LicenseType.professional;
+      case 'enterprise':
+        return LicenseType.enterprise;
+      default:
+        throw Exception('Invalid license type: $type');
     }
   }
 
@@ -174,32 +175,34 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
   @override
   Widget build(BuildContext context) => Scaffold(
         body: Container(
-            decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                        Colors.blue.shade900,
-                        Colors.teal.shade700,
-                    ],
-                ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.blue.shade900,
+                Colors.teal.shade700,
+              ],
             ),
-            child: SafeArea(
-                child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                    children: [
-                        _buildAnimatedHeader(),
-                        const SizedBox(height: 40),
-                        _buildPlanSelector(),
-                        const SizedBox(height: 40),
-                        _buildLicenseForm(),
-                        const SizedBox(height: 30),
-                        _buildActivationControls(),
-                    ],
-                ),
+          ),
+          child: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              children: [
+                _buildAnimatedHeader(),
+                const SizedBox(height: 20),
+                _buildHelpButton(), // New help button
+                const SizedBox(height: 20),
+                _buildPlanSelector(),
+                const SizedBox(height: 40),
+                _buildLicenseForm(),
+                const SizedBox(height: 30),
+                _buildActivationControls(),
+              ],
             ),
+          ),
         ),
-    );
+      );
 
   Widget _buildAnimatedHeader() {
     return Center(
@@ -220,6 +223,40 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
     );
   }
 
+  Widget _buildHelpButton() {
+    return Center(
+      child: IconButton(
+        icon: const Icon(Icons.help_outline, color: Colors.white),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('License Key Format'),
+              content: const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Demo: DEMO-XXXX-XXXX-XXXX'),
+                  Text('Professional: PRO-XXXX-XXXX-XXXX'),
+                  Text('Enterprise: ENT-XXXX-XXXX-XXXX'),
+                  SizedBox(height: 16),
+                  Text('Where X represents numbers 0-9'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Got it'),
+                ),
+              ],
+            ),
+          );
+        },
+        tooltip: 'License Key Format Help',
+      ),
+    );
+  }
+
   Widget _buildPlanSelector() {
     return SizedBox(
       height: 400,
@@ -229,7 +266,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(width: 20),  
+              const SizedBox(width: 20),
               _buildPlanCard(
                 LicenseType.demo,
                 'Demo',
@@ -271,7 +308,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
                   PlanFeature(Icons.support_agent, 'Priority Support'),
                 ],
               ),
-              const SizedBox(width: 20),  
+              const SizedBox(width: 20),
             ],
           ),
         ),
@@ -303,9 +340,7 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
               offset: const Offset(0, 5),
             ),
           ],
-          border: isSelected
-              ? Border.all(color: Colors.white, width: 3)
-              : null,
+          border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
         ),
         child: Column(
           children: [
@@ -336,7 +371,9 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.white.withOpacity(0.1) : Colors.grey.shade50,
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.grey.shade50,
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(20),
                     bottomRight: Radius.circular(20),
@@ -358,7 +395,9 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
                             feature.text,
                             style: TextStyle(
                               fontSize: 16,
-                              color: isSelected ? Colors.white : Colors.grey.shade800,
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.grey.shade800,
                             ),
                           ),
                         ),
@@ -375,109 +414,132 @@ class _LicenseActivationScreenState extends State<LicenseActivationScreen>
   }
 
   Widget _buildLicenseForm() {
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            colors: [Colors.white, Colors.grey.shade50],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'License Details',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.teal[900],
-                    fontWeight: FontWeight.bold,
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Card(
+          elevation: 8,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                colors: [Colors.white, Colors.grey.shade50],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'License Details',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.teal[900],
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-            ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                prefixIcon: const Icon(Icons.email_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      hintText: '', // Removed placeholder
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    textCapitalization: TextCapitalization.characters,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(value)) {
+                        return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _licenseKeyController,
+                    decoration: InputDecoration(
+                      labelText: 'License Key',
+                      prefixIcon: const Icon(Icons.vpn_key_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      hintText: '', // Removed placeholder
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.copy),
+                        onPressed: () async {
+                          await Clipboard.setData(
+                              ClipboardData(text: _licenseKeyController.text));
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('License key copied to clipboard')),
+                          );
+                        },
+                      ),
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9\-]')),
+                      LicenseKeyFormatter(),
+                      UpperCaseTextFormatter(), // New formatter
+                    ],
+                    style: const TextStyle(
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    validator: _validateLicenseKey,
+                  ),
+                ],
               ),
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your email';
-                }
-                if (!value.contains('@')) {
-                  return 'Please enter a valid email';
-                }
-                return null;
-              },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _licenseKeyController,
-              onChanged: (value) {
-                // Auto-select the plan based on key prefix
-                if (value.startsWith('DEMO-')) {
-                  setState(() => _selectedType = LicenseType.demo);
-                } else if (value.startsWith('PRO-')) {
-                  setState(() => _selectedType = LicenseType.professional);
-                } else if (value.startsWith('ENT-')) {
-                  setState(() => _selectedType = LicenseType.enterprise);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: 'License Key',
-                hintText: 'Example: PRO-1234-5678-9012',
-                prefixIcon: const Icon(Icons.vpn_key_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9\-]')),
-                LicenseKeyFormatter(),
-              ],
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your license key';
-                }
-                
-                // Check if key prefix matches selected type
-                final prefix = value.split('-').first;
-                final expectedPrefix = switch (_selectedType) {
-                  LicenseType.demo => 'DEMO',
-                  LicenseType.professional => 'PRO',
-                  LicenseType.enterprise => 'ENT',
-                };
-                
-                if (prefix != expectedPrefix) {
-                  return 'Key must start with $expectedPrefix for ${_selectedType.toString().split('.').last} license';
-                }
-
-                // Validate full format
-                final validKeyFormat = RegExp(r'^(DEMO|PRO|ENT)-[0-9]{4}-[0-9]{4}-[0-9]{4}$');
-                if (!validKeyFormat.hasMatch(value)) {
-                  return 'Invalid license key format';
-                }
-
-                return null;
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  String? _validateLicenseKey(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your license key';
+    }
+
+    final prefix = value.split('-').first;
+    final expectedPrefix = switch (_selectedType) {
+      LicenseType.demo => 'DEMO',
+      LicenseType.professional => 'PRO',
+      LicenseType.enterprise => 'ENT',
+    };
+
+    if (prefix != expectedPrefix) {
+      return 'Key must start with $expectedPrefix for this license type';
+    }
+
+    final validKeyFormat =
+        RegExp(r'^(DEMO|PRO|ENT)-[0-9]{4}-[0-9]{4}-[0-9]{4}$');
+    if (!validKeyFormat.hasMatch(value)) {
+      return 'Format: XXX-0000-0000-0000';
+    }
+
+    return null;
   }
 
   Widget _buildActivationControls() {
@@ -521,10 +583,10 @@ class LicenseKeyFormatter extends TextInputFormatter {
   ) {
     // Convert to uppercase
     var text = newValue.text.toUpperCase();
-    
+
     // Remove any extra hyphens
     text = text.replaceAll('-', '');
-    
+
     // Limit to 16 characters (TYPE + 12 numbers)
     if (text.length > 16) {
       text = text.substring(0, 16);
@@ -532,7 +594,7 @@ class LicenseKeyFormatter extends TextInputFormatter {
 
     // Format with hyphens
     final buffer = StringBuffer();
-    
+
     // Handle the license type prefix (DEMO, PRO, ENT)
     if (text.length <= 4) {
       buffer.write(text);
@@ -540,7 +602,7 @@ class LicenseKeyFormatter extends TextInputFormatter {
       // Add the type prefix
       buffer.write(text.substring(0, 3));
       buffer.write('-');
-      
+
       // Add the remaining numbers in groups of 4
       var remainingDigits = text.substring(3);
       for (var i = 0; i < remainingDigits.length; i++) {
@@ -555,6 +617,19 @@ class LicenseKeyFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: string,
       selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
     );
   }
 }

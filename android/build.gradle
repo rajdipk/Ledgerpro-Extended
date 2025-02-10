@@ -1,10 +1,12 @@
 buildscript {
-    ext.kotlin_version = '1.7.10'
+    ext.kotlin_version = '1.7.22'
+    ext.java_version = JavaVersion.VERSION_17  // Changed to Java 17
+    
     repositories {
         google()
         mavenCentral()
     }
-
+    
     dependencies {
         classpath 'com.android.tools.build:gradle:7.3.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
@@ -30,7 +32,13 @@ tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
 
-// Add Java version compatibility
+allprojects {
+    tasks.withType(JavaCompile) {
+        sourceCompatibility = java_version
+        targetCompatibility = java_version
+    }
+}
+
 subprojects {
     project.configurations.all {
         resolutionStrategy.eachDependency { details ->

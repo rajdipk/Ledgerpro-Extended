@@ -1,34 +1,56 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
-  static final NotificationService instance = NotificationService._();
+  static NotificationService? _instance;
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  bool _isInitialized = false;
 
+  // Private constructor
   NotificationService._();
 
-  Future<void> initialize() async {
-    tz.initializeTimeZones();
+  // Factory constructor for singleton
+  factory NotificationService() {
+    _instance ??= NotificationService._();
+    return _instance!;
+  }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+  static NotificationService get instance => NotificationService();
 
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
+  Future<bool> initialize() async {
+    if (_isInitialized) return true;
 
-    await _notifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) async {
-        // Handle notification tap
-      },
-    );
+    try {
+      tz.initializeTimeZones();
+
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+
+      final initialized = await _notifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) async {
+          // Handle notification tap
+        },
+      );
+
+      _isInitialized = initialized ?? false;
+      return _isInitialized;
+    } catch (e) {
+      debugPrint('Error initializing notifications: $e');
+      _isInitialized = false;
+      return false;
+    }
   }
 
   Future<void> showLicenseExpiryNotification({
@@ -36,6 +58,9 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
     const androidDetails = AndroidNotificationDetails(
       'license_expiry',
       'License Expiry',
@@ -63,39 +88,54 @@ class NotificationService {
     );
   }
 
-  Future<void> scheduleLicenseExpiryNotification({
+  Future<bool> scheduleLicenseExpiryNotification({
     required int licenseId,
     required DateTime expiryDate,
   }) async {
-    // Schedule notification 7 days before expiry
-    final sevenDaysBefore = expiryDate.subtract(const Duration(days: 7));
-    if (sevenDaysBefore.isAfter(DateTime.now())) {
-      await _scheduleNotification(
-        id: licenseId * 2,
-        title: 'License Expiring Soon',
-        body: 'Your license will expire in 7 days. Please renew to continue using all features.',
-        scheduledDate: sevenDaysBefore,
-      );
-    }
+    try {
+      if (!_isInitialized) {
+        final initialized = await initialize();
+        if (!initialized) {
+          debugPrint('Failed to initialize notifications');
+          return false;
+        }
+      }
 
-    // Schedule notification 1 day before expiry
-    final oneDayBefore = expiryDate.subtract(const Duration(days: 1));
-    if (oneDayBefore.isAfter(DateTime.now())) {
-      await _scheduleNotification(
-        id: licenseId * 2 + 1,
-        title: 'License Expires Tomorrow',
-        body: 'Your license will expire tomorrow. Please renew now to avoid service interruption.',
-        scheduledDate: oneDayBefore,
-      );
-    }
+      // Schedule notification 7 days before expiry
+      final sevenDaysBefore = expiryDate.subtract(const Duration(days: 7));
+      if (sevenDaysBefore.isAfter(DateTime.now())) {
+        await _scheduleNotification(
+          id: licenseId * 2,
+          title: 'License Expiring Soon',
+          body: 'Your license will expire in 7 days. Please renew to continue using all features.',
+          scheduledDate: sevenDaysBefore,
+        );
+      }
 
-    // Schedule notification on expiry
-    await _scheduleNotification(
-      id: licenseId * 2 + 2,
-      title: 'License Expired',
-      body: 'Your license has expired. Please renew now to continue using all features.',
-      scheduledDate: expiryDate,
-    );
+      // Schedule notification 1 day before expiry
+      final oneDayBefore = expiryDate.subtract(const Duration(days: 1));
+      if (oneDayBefore.isAfter(DateTime.now())) {
+        await _scheduleNotification(
+          id: licenseId * 2 + 1,
+          title: 'License Expires Tomorrow',
+          body: 'Your license will expire tomorrow. Please renew now to avoid service interruption.',
+          scheduledDate: oneDayBefore,
+        );
+      }
+
+      // Schedule notification on expiry
+      await _scheduleNotification(
+        id: licenseId * 2 + 2,
+        title: 'License Expired',
+        body: 'Your license has expired. Please renew now to continue using all features.',
+        scheduledDate: expiryDate,
+      );
+
+      return true;
+    } catch (e) {
+      debugPrint('Error scheduling license expiry notifications: $e');
+      return false;
+    }
   }
 
   Future<void> _scheduleNotification({
@@ -136,6 +176,9 @@ class NotificationService {
   }
 
   Future<void> cancelLicenseNotifications(int licenseId) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
     // Cancel all notifications for this license (base ID * 2, *2+1, *2+2)
     await _notifications.cancel(licenseId * 2);
     await _notifications.cancel(licenseId * 2 + 1);

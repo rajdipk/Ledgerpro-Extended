@@ -79,7 +79,8 @@ class DatabaseHelper {
     // Version set to 1 initially, can be increased for future upgrades
     return await sqflite.openDatabase(
       path,
-      version: 11, // Increased from 10 to 11 for adding business_id to transactions
+      version:
+          12, // Increased from 11 to 12 for adding google_drive_credentials table
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -167,6 +168,7 @@ CREATE TABLE supplier_balances (
   business_id INTEGER,
   date TEXT,
   payable_balance REAL,
+  receivable_balance REAL,
   FOREIGN KEY (business_id) REFERENCES businesses(id)
 );
 ''');
@@ -329,7 +331,8 @@ CREATE TABLE licenses (
   customer_id $textNullable,
   customer_email $textNullable,
   last_validated_at $textNullable,
-  offline_grace_period_start $textNullable
+  offline_grace_period_start $textNullable,
+  is_active INTEGER NOT NULL DEFAULT 1
 )
 ''');
 
@@ -368,6 +371,19 @@ CREATE TABLE license_usage (
       count INTEGER NOT NULL DEFAULT 0,
       last_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (license_id) REFERENCES licenses (id)
+    )
+    ''');
+
+    // Create google_drive_credentials table
+    await db.execute('''
+    CREATE TABLE google_drive_credentials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      access_token TEXT,
+      refresh_token TEXT,
+      expiry_date TEXT,
+      auto_backup_enabled INTEGER DEFAULT 0,
+      backup_interval INTEGER DEFAULT 24,
+      last_backup_date TEXT
     )
     ''');
   }
@@ -448,8 +464,8 @@ CREATE TABLE IF NOT EXISTS license (
     )
     ''');
 
-    // Add transaction tracking table
-    await db.execute('''
+      // Add transaction tracking table
+      await db.execute('''
     CREATE TABLE IF NOT EXISTS transaction_tracking (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       license_id INTEGER NOT NULL,
@@ -461,8 +477,8 @@ CREATE TABLE IF NOT EXISTS license (
     )
     ''');
 
-    // Add license table
-    await db.execute('''
+      // Add license table
+      await db.execute('''
     CREATE TABLE IF NOT EXISTS licenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       license_key TEXT NOT NULL,
@@ -482,7 +498,8 @@ CREATE TABLE IF NOT EXISTS license (
     if (oldVersion < 11) {
       // Add business_id column to transactions table
       try {
-        await db.execute('ALTER TABLE transactions ADD COLUMN business_id INTEGER REFERENCES businesses(id)');
+        await db.execute(
+            'ALTER TABLE transactions ADD COLUMN business_id INTEGER REFERENCES businesses(id)');
         debugPrint('Added business_id column to transactions table');
 
         // Update existing transactions with business_id from their customers
@@ -510,6 +527,28 @@ CREATE TABLE IF NOT EXISTS license (
         debugPrint('Updated existing transactions with business_id');
       } catch (e) {
         debugPrint('Error upgrading database: $e');
+      }
+    }
+
+    if (oldVersion < 12) {
+      // Add google_drive_credentials table
+      try {
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS google_drive_credentials (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          access_token TEXT,
+          refresh_token TEXT,
+          expiry_date TEXT,
+          auto_backup_enabled INTEGER DEFAULT 0,
+          backup_interval INTEGER DEFAULT 24,
+          last_backup_date TEXT
+        )
+        ''');
+        debugPrint('Successfully created google_drive_credentials table');
+      } catch (e, stackTrace) {
+        debugPrint('Error creating google_drive_credentials table: $e');
+        debugPrint('Stack trace: $stackTrace');
+        rethrow;
       }
     }
   }
@@ -722,12 +761,12 @@ CREATE TABLE IF NOT EXISTS license (
     final db = await database;
     if (businessId != null) {
       final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
-        [businessId]
-      );
+          'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
+          [businessId]);
       return Sqflite.firstIntValue(result) ?? 0;
     } else {
-      final result = await db.rawQuery('SELECT COUNT(*) as count FROM customers');
+      final result =
+          await db.rawQuery('SELECT COUNT(*) as count FROM customers');
       return Sqflite.firstIntValue(result) ?? 0;
     }
   }
@@ -1238,21 +1277,37 @@ CREATE TABLE IF NOT EXISTS license (
   // Retrieve supplier balances for a specific business
   Future<List<Map<String, dynamic>>> getSupplierBalances(int businessId) async {
     final db = await database;
-    return await db.query(
+    debugPrint('Getting supplier balances for business: $businessId');
+
+    final balances = await db.query(
       'supplier_balances',
       where: 'business_id = ?',
       whereArgs: [businessId],
-      orderBy: 'date ASC',
+      orderBy: 'date DESC',
     );
+
+    debugPrint('Found ${balances.length} supplier balance records');
+    debugPrint(
+        'Latest balance record: ${balances.isNotEmpty ? balances.first : 'None'}');
+
+    return balances;
   }
 
   // A method to handle upserting (update or insert) the supplier balance data
   Future<void> upsertSupplierBalances(
-      int businessId, String date, double payableBalance,
-      {sqflite.Transaction? txn}) async {
+    int businessId,
+    String date,
+    double payableBalance, {
+    double receivableBalance = 0.0,
+    sqflite.Transaction? txn,
+  }) async {
     final db = txn ?? await database;
 
-    // Check if an entry for the given date already exists
+    debugPrint(
+        'Upserting supplier balances - Business: $businessId, Date: $date');
+    debugPrint('Payable: $payableBalance, Receivable: $receivableBalance');
+
+    // Check if an entry exists
     final existingEntries = await db.query(
       'supplier_balances',
       where: 'business_id = ? AND date = ?',
@@ -1265,17 +1320,22 @@ CREATE TABLE IF NOT EXISTS license (
         'supplier_balances',
         {
           'payable_balance': payableBalance,
+          'receivable_balance': receivableBalance,
         },
         where: 'business_id = ? AND date = ?',
         whereArgs: [businessId, date],
       );
     } else {
       // Insert new entry
-      await db.insert('supplier_balances', {
-        'business_id': businessId,
-        'date': date,
-        'payable_balance': payableBalance,
-      });
+      await db.insert(
+        'supplier_balances',
+        {
+          'business_id': businessId,
+          'date': date,
+          'payable_balance': payableBalance,
+          'receivable_balance': receivableBalance,
+        },
+      );
     }
   }
 
@@ -1824,23 +1884,23 @@ CREATE TABLE IF NOT EXISTS license (
         WHERE b.business_id = ?
         ORDER BY b.created_at DESC
       ''', [businessId]);
-      
+
       debugPrint('DatabaseHelper - Raw bills: $bills');
-      
+
       // Create new list to store processed bills
       final List<Map<String, dynamic>> processedBills = [];
-      
+
       // For each bill, create a new map with all the data
       for (final bill in bills) {
         final billId = bill['id'] as int;
         final items = await getBillItems(billId);
-        
+
         // Create a new map for the bill
         final processedBill = Map<String, dynamic>.from(bill);
-        
+
         // Add items
         processedBill['items'] = items;
-        
+
         // Create customer map with proper structure
         processedBill['customer'] = {
           'id': bill['customer_id'] ?? 0,
@@ -1863,7 +1923,7 @@ CREATE TABLE IF NOT EXISTS license (
           'gstin': bill['business_gstin'] ?? '',
           'pan': bill['business_pan'] ?? '',
         };
-        
+
         // Remove redundant fields
         processedBill.remove('customer_id');
         processedBill.remove('customer_business_id');
@@ -1879,10 +1939,10 @@ CREATE TABLE IF NOT EXISTS license (
         processedBill.remove('business_email');
         processedBill.remove('business_gstin');
         processedBill.remove('business_pan');
-        
+
         processedBills.add(processedBill);
       }
-      
+
       debugPrint('DatabaseHelper - Processed bills: $processedBills');
       return processedBills;
     } catch (e, stackTrace) {
@@ -1915,9 +1975,9 @@ CREATE TABLE IF NOT EXISTS license (
         LEFT JOIN inventory_items i ON bi.item_id = i.id
         WHERE bi.bill_id = ?
       ''', [billId]);
-      
+
       debugPrint('DatabaseHelper - Raw bill items: $items');
-      
+
       // Process items to include full item details
       final processedItems = items.map((item) {
         final processedItem = Map<String, dynamic>.from(item);
@@ -1930,7 +1990,7 @@ CREATE TABLE IF NOT EXISTS license (
           'unit': item['item_unit'],
           'selling_price': item['item_selling_price'],
         };
-        
+
         // Remove redundant fields
         processedItem.remove('item_id');
         processedItem.remove('item_business_id');
@@ -1939,10 +1999,10 @@ CREATE TABLE IF NOT EXISTS license (
         processedItem.remove('item_stock');
         processedItem.remove('item_unit');
         processedItem.remove('item_selling_price');
-        
+
         return processedItem;
       }).toList();
-      
+
       debugPrint('DatabaseHelper - Processed bill items: $processedItems');
       return processedItems;
     } catch (e, stackTrace) {
@@ -2245,7 +2305,12 @@ CREATE TABLE IF NOT EXISTS license (
       VALUES (?, ?, 1, ?, ?)
       ON CONFLICT(license_id, transaction_type, period_start, period_end)
       DO UPDATE SET count = count + 1
-    ''', [licenseId, transactionType, periodStart.toIso8601String(), periodEnd.toIso8601String()]);
+    ''', [
+      licenseId,
+      transactionType,
+      periodStart.toIso8601String(),
+      periodEnd.toIso8601String()
+    ]);
   }
 
   Future<int> getTransactionCount(
@@ -2276,23 +2341,23 @@ CREATE TABLE IF NOT EXISTS license (
 
   Future<License?> getCurrentLicense() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('licenses', orderBy: 'id DESC', limit: 1);
+    final List<Map<String, dynamic>> maps =
+        await db.query('licenses', orderBy: 'id DESC', limit: 1);
 
     if (maps.isEmpty) return null;
 
     final map = maps.first;
-    
+
     // Parse features JSON string back to Map
     final featuresJson = map['features'] as String;
     final features = jsonDecode(featuresJson) as Map<String, dynamic>;
-    
+
     return License(
       licenseKey: map['license_key'] as String,
       licenseType: LicenseType.values.firstWhere(
-        (e) => e.toString().split('.').last == map['license_type']
-      ),
+          (e) => e.toString().split('.').last == map['license_type']),
       activationDate: DateTime.parse(map['activation_date'] as String),
-      expiryDate: map['expiry_date'] != null 
+      expiryDate: map['expiry_date'] != null
           ? DateTime.parse(map['expiry_date'] as String)
           : null,
       features: features,
@@ -2300,13 +2365,13 @@ CREATE TABLE IF NOT EXISTS license (
     );
   }
 
-  Future<void> saveLicense(License license) async {
+  Future<int> saveLicense(License license) async {
     final db = await database;
-    
+
     // Convert features map to JSON string
     final featuresJson = jsonEncode(license.features);
-    
-    await db.insert(
+
+    return await db.insert(
       'licenses',
       {
         'license_key': license.licenseKey,
@@ -2334,10 +2399,21 @@ CREATE TABLE IF NOT EXISTS license (
 
   Future<void> deleteLicense() async {
     final db = await database;
-    await db.delete('licenses', where: 'is_active = 1');
+    // First check if is_active column exists
+    final tableInfo = await db.rawQuery('PRAGMA table_info(licenses)');
+    final hasIsActive =
+        tableInfo.any((column) => column['name'] == 'is_active');
+
+    if (hasIsActive) {
+      await db.delete('licenses', where: 'is_active = 1');
+    } else {
+      // If is_active doesn't exist, delete all licenses
+      await db.delete('licenses');
+    }
   }
 
-  Future<void> updateOfflineGracePeriod(int licenseId, DateTime? startTime) async {
+  Future<void> updateOfflineGracePeriod(
+      int licenseId, DateTime? startTime) async {
     final db = await database;
     await db.update(
       'licenses',
@@ -2375,43 +2451,8 @@ CREATE TABLE IF NOT EXISTS license (
 
   Future<Map<String, dynamic>> exportData(int businessId) async {
     final db = await database;
-    
+
     try {
-      // Get all transactions for this business
-      final transactions = await db.query(
-        'transactions',
-        where: 'business_id = ?',
-        whereArgs: [businessId],
-      );
-
-      // Get all customers for this business
-      final customers = await db.query(
-        'customers',
-        where: 'business_id = ?',
-        whereArgs: [businessId],
-      );
-
-      // Get all suppliers for this business
-      final suppliers = await db.query(
-        'suppliers',
-        where: 'business_id = ?',
-        whereArgs: [businessId],
-      );
-
-      // Get all inventory items for this business
-      final inventoryItems = await db.query(
-        'inventory_items',
-        where: 'business_id = ?',
-        whereArgs: [businessId],
-      );
-
-      // Get all purchase orders for this business
-      final purchaseOrders = await db.query(
-        'purchase_orders',
-        where: 'business_id = ?',
-        whereArgs: [businessId],
-      );
-
       // Get the business details
       final List<Map<String, dynamic>> businesses = await db.query(
         'businesses',
@@ -2423,16 +2464,91 @@ CREATE TABLE IF NOT EXISTS license (
         throw Exception('Business not found');
       }
 
+      // Get all related data for this business
+      final customers = await db.query(
+        'customers',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final suppliers = await db.query(
+        'suppliers',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final transactions = await db.query(
+        'transactions',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final inventoryItems = await db.query(
+        'inventory_items',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final stockMovements = await db.query(
+        'stock_movements',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final purchaseOrders = await db.query(
+        'purchase_orders',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final purchaseOrderItems = await db.rawQuery('''
+        SELECT poi.* 
+        FROM purchase_order_items poi
+        INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
+        WHERE po.business_id = ?
+      ''', [businessId]);
+
+      final bills = await db.query(
+        'bills',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final billItems = await db.rawQuery('''
+        SELECT bi.* 
+        FROM bill_items bi
+        INNER JOIN bills b ON bi.bill_id = b.id
+        WHERE b.business_id = ?
+      ''', [businessId]);
+
+      final customerBalances = await db.query(
+        'customer_balances',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
+      final supplierBalances = await db.query(
+        'supplier_balances',
+        where: 'business_id = ?',
+        whereArgs: [businessId],
+      );
+
       // Create the backup data structure
       final backupData = {
-        'version': 11,
+        'version': 12, // Updated version to match current schema
         'timestamp': DateTime.now().toIso8601String(),
         'business': businesses.first,
         'customers': customers,
         'suppliers': suppliers,
         'transactions': transactions,
         'inventory_items': inventoryItems,
+        'stock_movements': stockMovements,
         'purchase_orders': purchaseOrders,
+        'purchase_order_items': purchaseOrderItems,
+        'bills': bills,
+        'bill_items': billItems,
+        'customer_balances': customerBalances,
+        'supplier_balances': supplierBalances,
       };
 
       return _sanitizeData(backupData);
@@ -2444,14 +2560,14 @@ CREATE TABLE IF NOT EXISTS license (
 
   Future<void> importData(Map<String, dynamic> backup) async {
     final db = await database;
-    
+
     try {
       print('Starting data import with backup data: $backup');
-      
+
       // Convert numeric fields in the backup data
       final convertedBackup = Map<String, dynamic>.from(backup);
       _convertNumericFields(convertedBackup);
-      
+
       print('Converted backup data: $convertedBackup');
 
       await db.transaction((txn) async {
@@ -2461,9 +2577,10 @@ CREATE TABLE IF NOT EXISTS license (
           throw Exception('Business data is missing from backup');
         }
         if (businessData is! Map<String, dynamic>) {
-          throw Exception('Business data is not a Map: ${businessData.runtimeType}');
+          throw Exception(
+              'Business data is not a Map: ${businessData.runtimeType}');
         }
-        
+
         final businessId = businessData['id'];
         if (businessId == null) {
           throw Exception('Business ID is missing');
@@ -2472,83 +2589,152 @@ CREATE TABLE IF NOT EXISTS license (
         print('Processing business data: $businessData');
 
         // Delete existing data for this business
-        await txn.delete('transactions', where: 'business_id = ?', whereArgs: [businessId]);
-        await txn.delete('customers', where: 'business_id = ?', whereArgs: [businessId]);
-        await txn.delete('suppliers', where: 'business_id = ?', whereArgs: [businessId]);
-        await txn.delete('inventory_items', where: 'business_id = ?', whereArgs: [businessId]);
-        await txn.delete('purchase_orders', where: 'business_id = ?', whereArgs: [businessId]);
-        await txn.delete('businesses', where: 'id = ?', whereArgs: [businessId]);
+        await txn.delete('transactions',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('customers',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('suppliers',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('inventory_items',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('stock_movements',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('purchase_orders',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn
+            .delete('bills', where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('customer_balances',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn.delete('supplier_balances',
+            where: 'business_id = ?', whereArgs: [businessId]);
+        await txn
+            .delete('businesses', where: 'id = ?', whereArgs: [businessId]);
 
         // Insert the business
         await txn.insert('businesses', businessData);
 
         // Insert customers
         final customers = convertedBackup['customers'];
-        if (customers != null) {
-          if (customers is! List) {
-            throw Exception('Customers data is not a List: ${customers.runtimeType}');
-          }
+        if (customers != null && customers is List) {
           print('Processing ${customers.length} customers');
           for (var customer in customers) {
-            if (customer is! Map<String, dynamic>) {
-              print('Skipping invalid customer data: $customer');
-              continue;
+            if (customer is Map<String, dynamic>) {
+              await txn.insert('customers', customer);
             }
-            await txn.insert('customers', customer);
           }
         }
 
         // Insert suppliers
         final suppliers = convertedBackup['suppliers'];
-        if (suppliers != null) {
-          if (suppliers is! List) {
-            throw Exception('Suppliers data is not a List: ${suppliers.runtimeType}');
-          }
+        if (suppliers != null && suppliers is List) {
           print('Processing ${suppliers.length} suppliers');
           for (var supplier in suppliers) {
-            if (supplier is! Map<String, dynamic>) {
-              print('Skipping invalid supplier data: $supplier');
-              continue;
+            if (supplier is Map<String, dynamic>) {
+              await txn.insert('suppliers', supplier);
             }
-            await txn.insert('suppliers', supplier);
           }
         }
 
         // Insert transactions
         final transactions = convertedBackup['transactions'];
-        if (transactions != null) {
-          if (transactions is! List) {
-            throw Exception('Transactions data is not a List: ${transactions.runtimeType}');
-          }
+        if (transactions != null && transactions is List) {
           print('Processing ${transactions.length} transactions');
           for (var transaction in transactions) {
-            if (transaction is! Map<String, dynamic>) {
-              print('Skipping invalid transaction data: $transaction');
-              continue;
+            if (transaction is Map<String, dynamic>) {
+              await txn.insert('transactions', transaction);
             }
-            final transactionData = Map<String, dynamic>.from(transaction);
-            transactionData['business_id'] = businessId;
-            await txn.insert('transactions', transactionData);
           }
         }
 
         // Insert inventory items
         final inventoryItems = convertedBackup['inventory_items'];
-        if (inventoryItems != null) {
-          if (inventoryItems is! List) {
-            throw Exception('Inventory items data is not a List: ${inventoryItems.runtimeType}');
-          }
+        if (inventoryItems != null && inventoryItems is List) {
           print('Processing ${inventoryItems.length} inventory items');
           for (var item in inventoryItems) {
-            if (item is! Map<String, dynamic>) {
-              print('Skipping invalid inventory item data: $item');
-              continue;
+            if (item is Map<String, dynamic>) {
+              await txn.insert('inventory_items', item);
             }
-            await txn.insert('inventory_items', item);
+          }
+        }
+
+        // Insert stock movements
+        final stockMovements = convertedBackup['stock_movements'];
+        if (stockMovements != null && stockMovements is List) {
+          print('Processing ${stockMovements.length} stock movements');
+          for (var movement in stockMovements) {
+            if (movement is Map<String, dynamic>) {
+              await txn.insert('stock_movements', movement);
+            }
+          }
+        }
+
+        // Insert purchase orders
+        final purchaseOrders = convertedBackup['purchase_orders'];
+        if (purchaseOrders != null && purchaseOrders is List) {
+          print('Processing ${purchaseOrders.length} purchase orders');
+          for (var order in purchaseOrders) {
+            if (order is Map<String, dynamic>) {
+              await txn.insert('purchase_orders', order);
+            }
+          }
+        }
+
+        // Insert purchase order items
+        final purchaseOrderItems = convertedBackup['purchase_order_items'];
+        if (purchaseOrderItems != null && purchaseOrderItems is List) {
+          print('Processing ${purchaseOrderItems.length} purchase order items');
+          for (var item in purchaseOrderItems) {
+            if (item is Map<String, dynamic>) {
+              await txn.insert('purchase_order_items', item);
+            }
+          }
+        }
+
+        // Insert bills
+        final bills = convertedBackup['bills'];
+        if (bills != null && bills is List) {
+          print('Processing ${bills.length} bills');
+          for (var bill in bills) {
+            if (bill is Map<String, dynamic>) {
+              await txn.insert('bills', bill);
+            }
+          }
+        }
+
+        // Insert bill items
+        final billItems = convertedBackup['bill_items'];
+        if (billItems != null && billItems is List) {
+          print('Processing ${billItems.length} bill items');
+          for (var item in billItems) {
+            if (item is Map<String, dynamic>) {
+              await txn.insert('bill_items', item);
+            }
+          }
+        }
+
+        // Insert customer balances
+        final customerBalances = convertedBackup['customer_balances'];
+        if (customerBalances != null && customerBalances is List) {
+          print('Processing ${customerBalances.length} customer balances');
+          for (var balance in customerBalances) {
+            if (balance is Map<String, dynamic>) {
+              await txn.insert('customer_balances', balance);
+            }
+          }
+        }
+
+        // Insert supplier balances
+        final supplierBalances = convertedBackup['supplier_balances'];
+        if (supplierBalances != null && supplierBalances is List) {
+          print('Processing ${supplierBalances.length} supplier balances');
+          for (var balance in supplierBalances) {
+            if (balance is Map<String, dynamic>) {
+              await txn.insert('supplier_balances', balance);
+            }
           }
         }
       });
-      
+
       print('Data import completed successfully');
     } catch (e, stackTrace) {
       print('Error importing data: $e');
@@ -2611,19 +2797,231 @@ CREATE TABLE IF NOT EXISTS license (
 
   Future<int> getInventoryCount() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM inventory_items');
+    final result =
+        await db.rawQuery('SELECT COUNT(*) as count FROM inventory_items');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> getMonthlyTransactionCount() async {
     final db = await database;
-    final startOfMonth = DateTime.now().subtract(
-      Duration(days: DateTime.now().day - 1)
-    );
+    final startOfMonth =
+        DateTime.now().subtract(Duration(days: DateTime.now().day - 1));
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM transactions WHERE date >= ?',
-      [startOfMonth.toIso8601String()]
-    );
+        'SELECT COUNT(*) as count FROM transactions WHERE date >= ?',
+        [startOfMonth.toIso8601String()]);
     return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<List<Map<String, dynamic>>> getCombinedTransactions(
+      int businessId) async {
+    final db = await database;
+    debugPrint('Fetching transactions for business: $businessId');
+
+    try {
+      // Updated query to properly cast numeric values and handle dates
+      final result = await db.rawQuery('''
+        SELECT 
+          t.id,
+          t.business_id,
+          t.customer_id,
+          t.supplier_id,
+          CAST(t.amount AS REAL) as amount,
+          t.date,
+          CAST(t.balance AS REAL) as balance,
+          t.notes,
+          c.name as customer_name,
+          s.name as supplier_name,
+          CASE 
+            WHEN t.customer_id IS NOT NULL THEN 'customer'
+            WHEN t.supplier_id IS NOT NULL THEN 'supplier'
+          END as transaction_type
+        FROM transactions t
+        LEFT JOIN customers c ON t.customer_id = c.id
+        LEFT JOIN suppliers s ON t.supplier_id = s.id
+        WHERE t.business_id = ?
+        ORDER BY datetime(t.date) DESC
+      ''', [businessId]);
+
+      // Debug logging
+      debugPrint('Found ${result.length} transactions');
+      if (result.isNotEmpty) {
+        debugPrint('First transaction: ${result.first}');
+        debugPrint('Amount type: ${result.first['amount'].runtimeType}');
+        debugPrint('Balance type: ${result.first['balance'].runtimeType}');
+      }
+
+      return result;
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching transactions: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getTransactionStats(int businessId) async {
+    final db = await database;
+    try {
+      final result = await db.rawQuery('''
+        SELECT 
+          COUNT(*) as total_count,
+          SUM(CASE WHEN amount < 0 THEN 1 ELSE 0 END) as outgoing_count,
+          SUM(CASE WHEN amount > 0 THEN 1 ELSE 0 END) as incoming_count,
+          SUM(CASE WHEN customer_id IS NOT NULL THEN 1 ELSE 0 END) as customer_count,
+          SUM(CASE WHEN supplier_id IS NOT NULL THEN 1 ELSE 0 END) as supplier_count
+        FROM transactions
+        WHERE business_id = ?
+      ''', [businessId]);
+
+      return result.first;
+    } catch (e) {
+      debugPrint('Error getting transaction stats: $e');
+      return {
+        'total_count': 0,
+        'outgoing_count': 0,
+        'incoming_count': 0,
+        'customer_count': 0,
+        'supplier_count': 0
+      };
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionsByDateRange(
+    int businessId,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final db = await database;
+    try {
+      return await db.rawQuery('''
+        SELECT 
+          t.*,
+          c.name as customer_name,
+          s.name as supplier_name
+        FROM transactions t
+        LEFT JOIN customers c ON t.customer_id = c.id
+        LEFT JOIN suppliers s ON t.supplier_id = s.id
+        WHERE t.business_id = ? 
+        AND t.date BETWEEN ? AND ?
+        ORDER BY t.date DESC
+      ''', [
+        businessId,
+        startDate.toIso8601String(),
+        endDate.toIso8601String(),
+      ]);
+    } catch (e) {
+      debugPrint('Error fetching transactions by date range: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, double>> getTransactionTotals(int businessId) async {
+    final db = await database;
+    try {
+      final result = await db.rawQuery('''
+        SELECT 
+          COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_outgoing,
+          COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_incoming
+        FROM transactions
+        WHERE business_id = ?
+      ''', [businessId]);
+
+      final row = result.first;
+      return {
+        'total_outgoing': row['total_outgoing'] as double,
+        'total_incoming': row['total_incoming'] as double,
+      };
+    } catch (e) {
+      debugPrint('Error getting transaction totals: $e');
+      return {
+        'total_outgoing': 0.0,
+        'total_incoming': 0.0,
+      };
+    }
+  }
+
+  // Google Drive Credentials Methods
+  Future<Map<String, dynamic>?> getGoogleDriveCredentials() async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.query(
+      'google_drive_credentials',
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return {
+      'access_token': result.first['access_token'],
+      'refresh_token': result.first['refresh_token'],
+      'expiry_date': result.first['expiry_date'],
+      'auto_backup_enabled': result.first['auto_backup_enabled'],
+      'backup_interval': result.first['backup_interval'],
+      'last_backup_date': result.first['last_backup_date'],
+    };
+  }
+
+  Future<void> saveGoogleDriveCredentials({
+    required String accessToken,
+    required String refreshToken,
+    required String expiryDate,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'google_drive_credentials',
+      {
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'expiry_date': expiryDate,
+        'auto_backup_enabled': 0,
+        'backup_interval': 24,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> clearGoogleDriveCredentials() async {
+    final db = await database;
+    await db.delete('google_drive_credentials');
+  }
+
+  Future<void> updateGoogleDriveSettings({
+    bool? autoBackupEnabled,
+    int? backupInterval,
+    DateTime? lastBackupDate,
+  }) async {
+    final db = await database;
+    final Map<String, dynamic> values = {};
+
+    if (autoBackupEnabled != null) {
+      values['auto_backup_enabled'] = autoBackupEnabled ? 1 : 0;
+    }
+    if (backupInterval != null) {
+      values['backup_interval'] = backupInterval;
+    }
+    if (lastBackupDate != null) {
+      values['last_backup_date'] = lastBackupDate.toIso8601String();
+    }
+
+    if (values.isEmpty) return;
+
+    final List<Map<String, dynamic>> existing = await db.query(
+      'google_drive_credentials',
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      values['access_token'] = '';
+      values['refresh_token'] = '';
+      values['expiry_date'] = DateTime.now().toIso8601String();
+      await db.insert('google_drive_credentials', values);
+    } else {
+      await db.update(
+        'google_drive_credentials',
+        values,
+        where: 'id = ?',
+        whereArgs: [existing.first['id']],
+      );
+    }
   }
 }

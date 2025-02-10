@@ -117,47 +117,6 @@ class _NavigationPanelState extends State<NavigationPanel> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'LedgerPro',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.account_circle,
-                            color: Colors.white),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const AccountDetailsScreen(),
-                            ),
-                          );
-                        },
-                        tooltip: 'Account Details',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    licenseProvider.currentLicense?.licenseType
-                            .toString()
-                            .split('.')
-                            .last
-                            .toUpperCase() ??
-                        'DEMO',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
                     children: [
                       Container(
                         width: 60,
@@ -188,13 +147,47 @@ class _NavigationPanelState extends State<NavigationPanel> {
                               ),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'LedgerPro',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'LedgerPro',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              licenseProvider.currentLicense?.licenseType
+                                      .toString()
+                                      .split('.')
+                                      .last
+                                      .toUpperCase() ??
+                                  'DEMO',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.info_outline_rounded,
+                            color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AccountDetailsScreen(),
+                            ),
+                          );
+                        },
+                        tooltip: 'Account Details',
                       ),
                     ],
                   ),

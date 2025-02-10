@@ -73,7 +73,8 @@ class SupplierOperations {
     return 0.0;
   }
 
-  Future<List<my_model.Transaction>> getSupplierTransactions(int supplierId) async {
+  Future<List<my_model.Transaction>> getSupplierTransactions(
+      int supplierId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'transactions',
@@ -96,22 +97,27 @@ class SupplierOperations {
     if (transaction.supplierId == null) {
       throw Exception('Supplier ID cannot be null');
     }
-    
+    if (transaction.businessId == null) {
+      throw Exception('Business ID cannot be null');
+    }
+
     final db = await database;
-    
+
     // Start a transaction to ensure data consistency
     return await db.transaction((txn) async {
       // Get current supplier balance
-      final currentBalance = await getSupplierBalance(transaction.supplierId!, txn: txn);
-      
+      final currentBalance =
+          await getSupplierBalance(transaction.supplierId!, txn: txn);
+
       // Calculate new balance
       final newBalance = currentBalance + transaction.amount;
-      
+
       // Insert transaction
       final transactionId = await txn.insert(
         'transactions',
         {
           'supplier_id': transaction.supplierId,
+          'business_id': transaction.businessId,
           'customer_id': null,
           'amount': transaction.amount,
           'date': transaction.date,
@@ -131,11 +137,12 @@ class SupplierOperations {
     });
   }
 
-  Future<void> updateSupplierTransaction(my_model.Transaction transaction) async {
+  Future<void> updateSupplierTransaction(
+      my_model.Transaction transaction) async {
     if (transaction.id == null || transaction.supplierId == null) {
       throw Exception('Transaction ID and Supplier ID cannot be null');
     }
-    
+
     final db = await database;
     await db.transaction((txn) async {
       // Update the transaction
@@ -154,7 +161,8 @@ class SupplierOperations {
     });
   }
 
-  Future<void> deleteSupplierTransaction(int transactionId, int supplierId) async {
+  Future<void> deleteSupplierTransaction(
+      int transactionId, int supplierId) async {
     final db = await database;
     await db.transaction((txn) async {
       // Delete the transaction
@@ -169,7 +177,8 @@ class SupplierOperations {
     });
   }
 
-  Future<void> _recalculateBalances(int supplierId, int fromTransactionId, Transaction txn) async {
+  Future<void> _recalculateBalances(
+      int supplierId, int fromTransactionId, Transaction txn) async {
     // Get all transactions after the given transaction ID
     final List<Map<String, dynamic>> subsequentTransactions = await txn.query(
       'transactions',
@@ -214,7 +223,7 @@ class SupplierOperations {
 
   Future<void> recalculateSupplierBalance(int supplierId) async {
     final db = await database;
-    
+
     await db.transaction((txn) async {
       // Get all transactions for the supplier
       final transactions = await txn.query(
@@ -225,7 +234,7 @@ class SupplierOperations {
       );
 
       double balance = 0.0;
-      
+
       // Recalculate balance for each transaction
       for (final transaction in transactions) {
         balance += transaction['amount'] as double;
@@ -246,14 +255,14 @@ class SupplierOperations {
   // Test method to verify supplier transactions
   Future<void> testSupplierTransactions(int supplierId) async {
     final db = await database;
-    
+
     await db.transaction((txn) async {
       print('Starting transaction test...');
-      
+
       // Get current supplier balance using transaction object
       final currentBalance = await getSupplierBalance(supplierId, txn: txn);
       print('Current balance: $currentBalance');
-      
+
       // Add a test payment transaction
       final paymentTransaction = my_model.Transaction(
         supplierId: supplierId,
@@ -261,10 +270,10 @@ class SupplierOperations {
         date: DateTime.now().toIso8601String(),
         balance: 0,
       );
-      
+
       print('Adding payment transaction...');
       final newBalance = currentBalance - 1000.0;
-      
+
       // Insert payment transaction
       final paymentId = await txn.insert(
         'transactions',
@@ -276,7 +285,7 @@ class SupplierOperations {
           'balance': newBalance,
         },
       );
-      
+
       // Update supplier balance
       await txn.update(
         'suppliers',
@@ -284,10 +293,10 @@ class SupplierOperations {
         where: 'id = ?',
         whereArgs: [supplierId],
       );
-      
+
       print('Payment transaction added. Balance: $newBalance');
       print('Adding receipt transaction...');
-      
+
       // Add a test receipt transaction
       final receiptTransaction = my_model.Transaction(
         supplierId: supplierId,
@@ -295,10 +304,10 @@ class SupplierOperations {
         date: DateTime.now().toIso8601String(),
         balance: 0,
       );
-      
+
       // Calculate new balance after receipt
       final finalBalance = newBalance + 500.0;
-      
+
       // Insert receipt transaction
       final receiptId = await txn.insert(
         'transactions',
@@ -310,7 +319,7 @@ class SupplierOperations {
           'balance': finalBalance,
         },
       );
-      
+
       // Update supplier balance
       await txn.update(
         'suppliers',
@@ -318,29 +327,28 @@ class SupplierOperations {
         where: 'id = ?',
         whereArgs: [supplierId],
       );
-      
+
       print('Receipt transaction added. Balance: $finalBalance');
       print('\nVerifying all transactions in database:');
-      
-      final allTransactions = await txn.query('transactions', 
-        where: 'supplier_id = ?',
-        whereArgs: [supplierId],
-        orderBy: 'date DESC'
-      );
-      
+
+      final allTransactions = await txn.query('transactions',
+          where: 'supplier_id = ?',
+          whereArgs: [supplierId],
+          orderBy: 'date DESC');
+
       for (var transaction in allTransactions) {
         print('Transaction: ${transaction.toString()}');
       }
-      
+
       print('\nFinal supplier balance: $finalBalance');
-      
+
       // Clean up test transactions
       await txn.delete(
         'transactions',
         where: 'id IN (?, ?)',
         whereArgs: [paymentId, receiptId],
       );
-      
+
       // Restore original balance
       await txn.update(
         'suppliers',
@@ -348,8 +356,9 @@ class SupplierOperations {
         where: 'id = ?',
         whereArgs: [supplierId],
       );
-      
-      print('Test completed and cleaned up. Balance restored to: $currentBalance');
+
+      print(
+          'Test completed and cleaned up. Balance restored to: $currentBalance');
     });
   }
 }

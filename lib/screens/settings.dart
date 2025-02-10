@@ -21,10 +21,12 @@ import '../services/backup_service.dart';
 class SignaturePainter extends CustomPainter {
   final Color color;
   final int seed;
-  
+
   SignaturePainter(this.color) : seed = math.Random().nextInt(4);
 
-  void drawPolygon(Canvas canvas, Size size, int sides, double radius, Paint paint, {double rotation = 0}) {
+  void drawPolygon(
+      Canvas canvas, Size size, int sides, double radius, Paint paint,
+      {double rotation = 0}) {
     final path = Path();
     final centerX = size.width / 2;
     final centerY = size.height / 2;
@@ -33,7 +35,7 @@ class SignaturePainter extends CustomPainter {
       final angle = (i * 2 * math.pi / sides) + rotation;
       final x = centerX + radius * math.cos(angle);
       final y = centerY + radius * math.sin(angle);
-      
+
       if (i == 0) {
         path.moveTo(x, y);
       } else {
@@ -48,14 +50,14 @@ class SignaturePainter extends CustomPainter {
     final centerX = size.width / 2;
     final centerY = size.height / 2;
     final radius = size.width * 0.4;
-    
+
     for (var i = 0; i < 8; i++) {
       final angle = i * math.pi / 4;
       final x1 = centerX + radius * math.cos(angle);
       final y1 = centerY + radius * math.sin(angle);
       final x2 = centerX + radius * 0.3 * math.cos(angle + math.pi / 4);
       final y2 = centerY + radius * 0.3 * math.sin(angle + math.pi / 4);
-      
+
       final path = Path()
         ..moveTo(x1, y1)
         ..lineTo(x2, y2);
@@ -68,11 +70,11 @@ class SignaturePainter extends CustomPainter {
     final centerX = size.width / 2;
     final centerY = size.height / 2;
     final maxRadius = size.width * 0.4;
-    
+
     var radius = maxRadius;
     var angle = 0.0;
     path.moveTo(centerX + radius, centerY);
-    
+
     while (radius > maxRadius * 0.1) {
       angle += 0.2;
       radius *= 0.95;
@@ -88,11 +90,11 @@ class SignaturePainter extends CustomPainter {
     final centerY = size.height / 2;
     final radius = size.width * 0.3;
     const petalCount = 6;
-    
+
     for (var i = 0; i < petalCount; i++) {
       final angle = i * 2 * math.pi / petalCount;
       final path = Path();
-      
+
       path.moveTo(centerX, centerY);
       path.quadraticBezierTo(
         centerX + radius * math.cos(angle + math.pi / petalCount),
@@ -106,7 +108,7 @@ class SignaturePainter extends CustomPainter {
         centerX,
         centerY,
       );
-      
+
       canvas.drawPath(path, paint);
     }
   }
@@ -123,13 +125,15 @@ class SignaturePainter extends CustomPainter {
       case 0:
         // Concentric polygons with connecting lines
         drawPolygon(canvas, size, 6, size.width * 0.4, paint);
-        drawPolygon(canvas, size, 3, size.width * 0.25, paint, rotation: math.pi / 6);
+        drawPolygon(canvas, size, 3, size.width * 0.25, paint,
+            rotation: math.pi / 6);
         drawStarPattern(canvas, size, paint);
         break;
       case 1:
         // Spiral pattern
         drawSpiral(canvas, size, paint);
-        drawPolygon(canvas, size, 4, size.width * 0.2, paint, rotation: math.pi / 4);
+        drawPolygon(canvas, size, 4, size.width * 0.2, paint,
+            rotation: math.pi / 4);
         break;
       case 2:
         // Flower pattern
@@ -140,7 +144,8 @@ class SignaturePainter extends CustomPainter {
         // Star burst pattern
         drawPolygon(canvas, size, 8, size.width * 0.4, paint);
         drawStarPattern(canvas, size, paint);
-        drawPolygon(canvas, size, 4, size.width * 0.2, paint, rotation: math.pi / 4);
+        drawPolygon(canvas, size, 4, size.width * 0.2, paint,
+            rotation: math.pi / 4);
         break;
     }
   }
@@ -195,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isAutoBackupEnabled = await _googleDriveService.isAutoBackupEnabled();
     final backupInterval = await _googleDriveService.getBackupInterval();
     final localBackupInterval = await _backupService.getLocalBackupInterval();
-    
+
     if (mounted) {
       setState(() {
         _isGoogleSignedIn = isSignedIn;
@@ -212,7 +217,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _showDeleteBusinessDialog(BuildContext context, List<Business> businesses) {
+  void _showDeleteBusinessDialog(
+      BuildContext context, List<Business> businesses) {
     final TextEditingController passwordController = TextEditingController();
     final FocusNode passwordFocusNode = FocusNode();
     String? selectedBusinessId;
@@ -288,19 +294,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           passwordFocusNode.unfocus();
                           cleanup();
                           Navigator.of(context).pop();
-                          
-                          final businessProvider = Provider.of<BusinessProvider>(
-                              context,
-                              listen: false);
-                          
+
+                          final businessProvider =
+                              Provider.of<BusinessProvider>(context,
+                                  listen: false);
+
                           try {
                             await businessProvider.deleteBusiness(
                                 selectedBusinessId!, passwordController.text);
-                            
+
                             if (businessProvider.isPasswordValid) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Business deleted successfully'),
+                                  content:
+                                      Text('Business deleted successfully'),
                                   backgroundColor: Colors.green,
                                 ),
                               );
@@ -308,8 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               // If there are remaining businesses, select the first one
                               if (businessProvider.businesses.isNotEmpty) {
                                 businessProvider.setSelectedBusinessId(
-                                  businessProvider.businesses.first.id
-                                );
+                                    businessProvider.businesses.first.id);
                               } else {
                                 businessProvider.setSelectedBusinessId(null);
                               }
@@ -379,9 +385,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             labelText: field.substring(0, 1).toUpperCase() + field.substring(1),
             border: const OutlineInputBorder(),
           ),
-          textCapitalization: field == 'gstin' 
-            ? TextCapitalization.characters 
-            : TextCapitalization.sentences,
+          textCapitalization: field == 'gstin'
+              ? TextCapitalization.characters
+              : TextCapitalization.sentences,
         ),
         actions: [
           TextButton(
@@ -430,7 +436,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _backupData() async {
     try {
       // Get the current business ID
-      final businessId = Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId;
+      final businessId = Provider.of<BusinessProvider>(context, listen: false)
+          .selectedBusinessId;
       if (businessId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No business selected')),
@@ -440,11 +447,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // Create local backup
       final success = await _backupService.createLocalBackup();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Local backup created successfully' : 'Failed to create local backup'),
+            content: Text(success
+                ? 'Local backup created successfully'
+                : 'Failed to create local backup'),
             backgroundColor: success ? Colors.green : Colors.red,
           ),
         );
@@ -464,7 +473,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _restoreData() async {
     try {
       // Get the current business ID
-      final businessId = Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId;
+      final businessId = Provider.of<BusinessProvider>(context, listen: false)
+          .selectedBusinessId;
       if (businessId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No business selected')),
@@ -478,8 +488,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Restore Data'),
           content: const Text(
-            'This will replace all existing data with the backup data. This action cannot be undone. Are you sure you want to continue?'
-          ),
+              'This will replace all existing data with the backup data. This action cannot be undone. Are you sure you want to continue?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -522,7 +531,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final modifiedDate = file.statSync().modified;
                 return ListTile(
                   title: Text(fileName),
-                  subtitle: Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(modifiedDate)),
+                  subtitle: Text(
+                      DateFormat('yyyy-MM-dd HH:mm:ss').format(modifiedDate)),
                   onTap: () => Navigator.of(context).pop(backups[index]),
                 );
               },
@@ -540,19 +550,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (selectedBackup == null) return;
 
       // Restore from selected backup
-      final success = await _backupService.restoreFromLocalBackup(selectedBackup);
-      
+      final success =
+          await _backupService.restoreFromLocalBackup(selectedBackup);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Data restored successfully' : 'Failed to restore data'),
+            content: Text(success
+                ? 'Data restored successfully'
+                : 'Failed to restore data'),
             backgroundColor: success ? Colors.green : Colors.red,
           ),
         );
 
         // Refresh the UI
         if (success) {
-          final businessProvider = Provider.of<BusinessProvider>(context, listen: false);
+          final businessProvider =
+              Provider.of<BusinessProvider>(context, listen: false);
           await businessProvider.loadBusinessesFromDb();
           await businessProvider.loadCustomerCount();
           await businessProvider.loadSupplierCount();
@@ -575,15 +589,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       if (_isGoogleSignedIn) {
         await _googleDriveService.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Successfully signed out from Google Drive')),
+        );
       } else {
         final success = await _googleDriveService.signIn();
         if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Successfully signed in to Google Drive')),
+            const SnackBar(
+              content: Text('Successfully signed in to Google Drive'),
+              backgroundColor: Colors.green,
+            ),
           );
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to sign in to Google Drive. Please check your credentials and try again.')),
+            const SnackBar(
+              content: Text(
+                  'Failed to sign in to Google Drive. Please check your credentials and try again.'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -591,21 +616,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error signing in to Google Drive: $e')),
+          SnackBar(
+            content: Text('Error with Google Drive: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
   Future<void> _toggleAutoBackup(bool value) async {
-    await _googleDriveService.setAutoBackupEnabled(value);
-    await _loadBackupStatus();
+    try {
+      await _googleDriveService.setAutoBackupEnabled(value);
+      await _loadBackupStatus();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(value ? 'Auto backup enabled' : 'Auto backup disabled'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating auto backup settings: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _updateBackupInterval(int? hours) async {
     if (hours != null) {
-      await _googleDriveService.setBackupInterval(hours);
-      await _loadBackupStatus();
+      try {
+        await _googleDriveService.setBackupInterval(hours);
+        await _loadBackupStatus();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Backup interval updated to $hours hours'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating backup interval: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -616,41 +683,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (!success) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please sign in to Google Drive first')),
+              const SnackBar(
+                content: Text('Please sign in to Google Drive first'),
+                backgroundColor: Colors.red,
+              ),
             );
           }
           return;
         }
       }
 
-      final businessId = Provider.of<BusinessProvider>(context, listen: false).selectedBusinessId;
+      final businessId = Provider.of<BusinessProvider>(context, listen: false)
+          .selectedBusinessId;
       if (businessId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No business selected')),
+          const SnackBar(
+            content: Text('No business selected'),
+            backgroundColor: Colors.red,
+          ),
         );
         return;
       }
 
-      // Create local backup
-      final success = await _backupService.createLocalBackup();
-      
+      // Show progress indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? 'Local backup created successfully' : 'Failed to create local backup'),
-            backgroundColor: success ? Colors.green : Colors.red,
+          const SnackBar(
+            content: Row(
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                SizedBox(width: 16),
+                Text('Creating backup...'),
+              ],
+            ),
+            duration: Duration(seconds: 30),
           ),
         );
       }
 
-      if (!success) return;
+      // Create local backup
+      final success = await _backupService.createLocalBackup();
+
+      if (!success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create local backup'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
       // Upload to Google Drive
       final backups = await _backupService.getLocalBackups();
       if (backups.isEmpty) {
         if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No local backups found')),
+            const SnackBar(
+              content: Text('No local backups found'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
@@ -658,18 +756,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final file = File(backups.last);
       final successUpload = await _googleDriveService.uploadBackup(file.path);
-      
+
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(successUpload ? 'Backup successfully uploaded to Google Drive' : 'Failed to upload backup to Google Drive'),
+            content: Text(successUpload
+                ? 'Backup successfully uploaded to Google Drive'
+                : 'Failed to upload backup to Google Drive'),
+            backgroundColor: successUpload ? Colors.green : Colors.red,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error backing up to Google Drive: $e')),
+          SnackBar(
+            content: Text('Error backing up to Google Drive: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -682,7 +788,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (!success) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please sign in to Google Drive first')),
+              const SnackBar(
+                content: Text('Please sign in to Google Drive first'),
+                backgroundColor: Colors.red,
+              ),
             );
           }
           return;
@@ -695,8 +804,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Restore from Google Drive'),
           content: const Text(
-            'This will download the latest backup from Google Drive and replace all existing data. This action cannot be undone. Are you sure you want to continue?'
-          ),
+              'This will download the latest backup from Google Drive and replace all existing data. This action cannot be undone. Are you sure you want to continue?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -712,12 +820,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (confirmed != true) return;
 
+      // Show progress indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                SizedBox(width: 16),
+                Text('Downloading backup...'),
+              ],
+            ),
+            duration: Duration(seconds: 30),
+          ),
+        );
+      }
+
       // Download latest backup
       final filePath = await _googleDriveService.downloadLatestBackup();
       if (filePath == null) {
         if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No backup found on Google Drive')),
+            const SnackBar(
+              content: Text('No backup found on Google Drive'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
@@ -727,18 +857,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final jsonString = await file.readAsString();
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
 
+      // Show restore progress
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                SizedBox(width: 16),
+                Text('Restoring data...'),
+              ],
+            ),
+            duration: Duration(seconds: 30),
+          ),
+        );
+      }
+
       // Restore the data
       await DatabaseHelper.instance.importData(data);
-      
+
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data restored successfully from Google Drive')),
+          const SnackBar(
+            content: Text('Data restored successfully from Google Drive'),
+            backgroundColor: Colors.green,
+          ),
         );
+
+        // Refresh the UI
+        final businessProvider =
+            Provider.of<BusinessProvider>(context, listen: false);
+        await businessProvider.loadBusinessesFromDb();
+        await businessProvider.loadCustomerCount();
+        await businessProvider.loadSupplierCount();
+        await businessProvider.calculateBalances();
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error restoring from Google Drive: $e')),
+          SnackBar(
+            content: Text('Error restoring from Google Drive: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -917,7 +1082,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Currency Symbol',
                     subtitle: 'Change currency symbol',
                     trailing: DropdownButton<String>(
-                      value: Provider.of<CurrencyProvider>(context).currencySymbol,
+                      value:
+                          Provider.of<CurrencyProvider>(context).currencySymbol,
                       onChanged: (String? newValue) {
                         if (newValue != null) {
                           Provider.of<CurrencyProvider>(context, listen: false)
@@ -945,7 +1111,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (context, businessProvider, child) {
                   final businesses = businessProvider.businesses;
                   final selectedBusiness = businesses.firstWhere(
-                    (business) => business.id == businessProvider.selectedBusinessId,
+                    (business) =>
+                        business.id == businessProvider.selectedBusinessId,
                     orElse: () => Business(
                       name: 'No business selected',
                     ),
@@ -1018,7 +1185,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: 'Delete Business',
                         subtitle: 'Remove a business and all its data',
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red),
                           onPressed: () {
                             if (businesses.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -1034,108 +1202,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       ...[
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Backup & Restore',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ListTile(
-                                leading: const Icon(Icons.cloud_download),
-                                title: const Text('Local Backup'),
-                                subtitle: const Text(
-                                  'Save all your business data to a local file'
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.arrow_forward_ios),
-                                  onPressed: _backupData,
-                                ),
-                              ),
-                              ListTile(
-                                leading: const Icon(Icons.cloud_upload),
-                                title: const Text('Restore from Local Backup'),
-                                subtitle: const Text(
-                                  'Restore your business data from a local backup file'
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.arrow_forward_ios),
-                                  onPressed: _restoreData,
-                                ),
-                              ),
-                              const Divider(),
-                              ListTile(
-                                leading: Icon(
-                                  _isGoogleSignedIn ? Icons.cloud_done : Icons.cloud_off,
-                                  color: _isGoogleSignedIn ? Colors.green : Colors.grey,
-                                ),
-                                title: Text(_isGoogleSignedIn 
-                                  ? 'Connected to Google Drive' 
-                                  : 'Connect to Google Drive'
-                                ),
-                                trailing: Switch(
-                                  value: _isGoogleSignedIn,
-                                  onChanged: (value) => _toggleGoogleSignIn(),
-                                ),
-                              ),
-                              if (_isGoogleSignedIn) ...[
-                                ListTile(
-                                  leading: const Icon(Icons.backup),
-                                  title: const Text('Auto Backup'),
-                                  subtitle: const Text('Automatically backup to Google Drive'),
-                                  trailing: Switch(
-                                    value: _isAutoBackupEnabled,
-                                    onChanged: _toggleAutoBackup,
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Backup & Restore',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                if (_isAutoBackupEnabled)
-                                  ListTile(
-                                    leading: const Icon(Icons.timer),
-                                    title: const Text('Backup Interval'),
-                                    subtitle: Text('Every $_backupInterval hours'),
-                                    trailing: DropdownButton<int>(
-                                      value: _backupInterval,
-                                      items: [6, 12, 24, 48, 72].map((hours) {
-                                        return DropdownMenuItem(
-                                          value: hours,
-                                          child: Text('$hours hrs'),
-                                        );
-                                      }).toList(),
-                                      onChanged: _updateBackupInterval,
-                                    ),
-                                  ),
-                                ListTile(
-                                  leading: const Icon(Icons.cloud_upload),
-                                  title: const Text('Backup to Google Drive'),
-                                  subtitle: const Text('Upload current data to Google Drive'),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.arrow_forward_ios),
-                                    onPressed: _backupToGoogleDrive,
-                                  ),
-                                ),
+                                const SizedBox(height: 16),
                                 ListTile(
                                   leading: const Icon(Icons.cloud_download),
-                                  title: const Text('Restore from Google Drive'),
-                                  subtitle: const Text('Download latest backup from Google Drive'),
+                                  title: const Text('Local Backup'),
+                                  subtitle: const Text(
+                                      'Save all your business data to a local file'),
                                   trailing: IconButton(
                                     icon: const Icon(Icons.arrow_forward_ios),
-                                    onPressed: _restoreFromGoogleDrive,
+                                    onPressed: _backupData,
                                   ),
                                 ),
+                                ListTile(
+                                  leading: const Icon(Icons.cloud_upload),
+                                  title:
+                                      const Text('Restore from Local Backup'),
+                                  subtitle: const Text(
+                                      'Restore your business data from a local backup file'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.arrow_forward_ios),
+                                    onPressed: _restoreData,
+                                  ),
+                                ),
+                                const Divider(),
+                                ListTile(
+                                  leading: Icon(
+                                    _isGoogleSignedIn
+                                        ? Icons.cloud_done
+                                        : Icons.cloud_off,
+                                    color: _isGoogleSignedIn
+                                        ? Colors.green
+                                        : Colors.grey,
+                                  ),
+                                  title: Text(_isGoogleSignedIn
+                                      ? 'Connected to Google Drive'
+                                      : 'Connect to Google Drive'),
+                                  trailing: Switch(
+                                    value: _isGoogleSignedIn,
+                                    onChanged: (value) => _toggleGoogleSignIn(),
+                                  ),
+                                ),
+                                if (_isGoogleSignedIn) ...[
+                                  ListTile(
+                                    leading: const Icon(Icons.backup),
+                                    title: const Text('Auto Backup'),
+                                    subtitle: const Text(
+                                        'Automatically backup to Google Drive'),
+                                    trailing: Switch(
+                                      value: _isAutoBackupEnabled,
+                                      onChanged: _toggleAutoBackup,
+                                    ),
+                                  ),
+                                  if (_isAutoBackupEnabled)
+                                    ListTile(
+                                      leading: const Icon(Icons.timer),
+                                      title: const Text('Backup Interval'),
+                                      subtitle:
+                                          Text('Every $_backupInterval hours'),
+                                      trailing: DropdownButton<int>(
+                                        value: _backupInterval,
+                                        items: [6, 12, 24, 48, 72].map((hours) {
+                                          return DropdownMenuItem(
+                                            value: hours,
+                                            child: Text('$hours hrs'),
+                                          );
+                                        }).toList(),
+                                        onChanged: _updateBackupInterval,
+                                      ),
+                                    ),
+                                  ListTile(
+                                    leading: const Icon(Icons.cloud_upload),
+                                    title: const Text('Backup to Google Drive'),
+                                    subtitle: const Text(
+                                        'Upload current data to Google Drive'),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.arrow_forward_ios),
+                                      onPressed: _backupToGoogleDrive,
+                                    ),
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.cloud_download),
+                                    title:
+                                        const Text('Restore from Google Drive'),
+                                    subtitle: const Text(
+                                        'Download latest backup from Google Drive'),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.arrow_forward_ios),
+                                      onPressed: _restoreFromGoogleDrive,
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+                        const SizedBox(height: 16),
+                      ],
                     ],
                   );
                 },
@@ -1160,9 +1335,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Signature
             Center(
               child: Container(
@@ -1178,16 +1353,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: CustomPaint(
                           key: _signatureKey,
                           painter: SignaturePainter(
-                            Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                            Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withOpacity(0.8),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withOpacity(0.5),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(

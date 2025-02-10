@@ -1,6 +1,6 @@
 // license_service.dart
 import 'dart:convert';
-import 'package:flutter/foundation.dart';  // Add this import for debugPrint
+import 'package:flutter/foundation.dart'; // Add this import for debugPrint
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http; // Add this import for http
 import '../database/database_helper.dart';
@@ -12,9 +12,11 @@ import 'storage_service.dart'; // Add this import
 
 class LicenseService {
   static final LicenseService instance = LicenseService._();
-  final ApiService _apiService = ApiService.instance; // Add this field
-  
-  LicenseService._();
+  late final ApiService _apiService;
+
+  LicenseService._() {
+    _apiService = ApiService.instance;
+  }
 
   // Generate a license key
   String generateLicenseKey(String email, LicenseType type) {
@@ -22,31 +24,33 @@ class LicenseService {
     final data = '$email-$type-$timestamp';
     final bytes = utf8.encode(data);
     final hash = sha256.convert(bytes);
-    
+
     // Take first 16 characters of hash and format as XXXX-XXXX-XXXX-XXXX
     final key = hash.toString().substring(0, 16).toUpperCase();
     return '${key.substring(0, 4)}-${key.substring(4, 8)}-'
-           '${key.substring(8, 12)}-${key.substring(12, 16)}';
+        '${key.substring(8, 12)}-${key.substring(12, 16)}';
   }
 
   // Validate a license key format
   bool isValidKeyFormat(String key) {
     // Check if key starts with valid prefix
-    if (!key.startsWith('DEMO-') && !key.startsWith('PRO-') && !key.startsWith('ENT-')) {
+    if (!key.startsWith('DEMO-') &&
+        !key.startsWith('PRO-') &&
+        !key.startsWith('ENT-')) {
       return false;
     }
-    
+
     // Check if rest of the key matches format: XXXX-XXXX-XXXX where X is a number
     final parts = key.split('-');
     if (parts.length != 4) return false;
-    
+
     // Skip first part (type), check remaining parts
     for (var i = 1; i < parts.length; i++) {
       if (!RegExp(r'^[0-9]{4}$').hasMatch(parts[i])) {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -54,12 +58,10 @@ class LicenseService {
   Future<License?> activateLicense(dynamic input) async {
     try {
       License license;
-      
+
       if (input is License) {
-        // Case 1: Input is already a License object
         license = input;
       } else if (input is Map<String, dynamic>) {
-        // Case 2: Input is a map of parameters
         final licenseKey = input['licenseKey'] as String;
         final email = input['email'] as String;
         final type = input['type'] as LicenseType;
@@ -68,7 +70,6 @@ class LicenseService {
           throw Exception('Invalid license key format');
         }
 
-        // Extract and validate the license type from the key
         final keyPrefix = licenseKey.split('-')[0];
         final keyType = switch (keyPrefix) {
           'DEMO' => LicenseType.demo,
@@ -78,7 +79,8 @@ class LicenseService {
         };
 
         if (keyType != type) {
-          throw Exception('License key prefix ($keyPrefix) does not match selected plan (${type.toString().split('.').last})');
+          throw Exception(
+              'License key prefix ($keyPrefix) does not match selected plan (${type.toString().split('.').last})');
         }
 
         final features = License.getDefaultFeatures(type);
@@ -98,16 +100,34 @@ class LicenseService {
         throw Exception('Invalid input type for license activation');
       }
 
-      // Save to database
-      await DatabaseHelper.instance.saveLicense(license);
+      debugPrint('Saving license to database: ${license.toMap()}');
 
-      // Schedule notifications if expiry date exists
-      if (license.expiryDate != null) {
-        await scheduleExpiryNotifications(license);
+      // Save to database and get the ID
+      final id = await DatabaseHelper.instance.saveLicense(license);
+
+      // Create a new license object with the ID
+      final savedLicense = License(
+        id: id,
+        licenseKey: license.licenseKey,
+        licenseType: license.licenseType,
+        activationDate: license.activationDate,
+        expiryDate: license.expiryDate,
+        features: license.features,
+        customerEmail: license.customerEmail,
+      );
+
+      // Try to schedule notifications, but don't let it block license activation
+      if (savedLicense.expiryDate != null) {
+        try {
+          await scheduleExpiryNotifications(savedLicense);
+        } catch (e) {
+          debugPrint('Warning: Could not schedule notifications: $e');
+          // Continue with license activation even if notifications fail
+        }
       }
 
-      debugPrint('License activated successfully: ${license.licenseKey}');
-      return license;
+      debugPrint('License activated successfully: ${savedLicense.toMap()}');
+      return savedLicense;
     } catch (e) {
       debugPrint('License activation error: $e');
       rethrow;
@@ -118,7 +138,7 @@ class LicenseService {
   Future<bool> isFeatureAvailable(String featureName) async {
     final license = await DatabaseHelper.instance.getCurrentLicense();
     if (license == null) return false;
-    
+
     if (license.isExpired()) return false;
     return license.hasFeature(featureName);
   }
@@ -127,9 +147,9 @@ class LicenseService {
   Future<bool> isWithinLimit(String limitName, int currentCount) async {
     final license = await DatabaseHelper.instance.getCurrentLicense();
     if (license == null) return false;
-    
+
     if (license.isExpired()) return false;
-    
+
     final limit = license.getFeatureLimit(limitName);
     if (limit == null || limit < 0) return true; // No limit or unlimited
     return currentCount < limit;
@@ -161,7 +181,8 @@ class LicenseService {
       final license = await DatabaseHelper.instance.getCurrentLicense();
       if (license != null) {
         // Cancel any scheduled notifications
-        await NotificationService.instance.cancelLicenseNotifications(license.id!);
+        await NotificationService.instance
+            .cancelLicenseNotifications(license.id!);
       }
 
       // Clear license from database
@@ -170,7 +191,7 @@ class LicenseService {
       // Clear any cached data or states
       await StorageService.instance.removeValue('last_validation');
       await StorageService.instance.removeValue('offline_grace_start');
-      
+
       debugPrint('License deactivated successfully');
     } catch (e) {
       debugPrint('Error deactivating license: $e');
@@ -233,7 +254,7 @@ class LicenseService {
 
     final currentCount = await getTransactionCount(transactionType);
     final limit = license.getFeatureLimit('${transactionType}_limit');
-    
+
     if (limit == null || limit < 0) return true; // No limit or unlimited
     return currentCount < limit;
   }
@@ -243,66 +264,92 @@ class LicenseService {
     final license = await DatabaseHelper.instance.getCurrentLicense();
     if (license == null || license.expiryDate == null) return;
 
-    final daysUntilExpiry = license.expiryDate!.difference(DateTime.now()).inDays;
+    final daysUntilExpiry =
+        license.expiryDate!.difference(DateTime.now()).inDays;
 
     if (daysUntilExpiry <= 7 && daysUntilExpiry > 0) {
       await NotificationService.instance.showLicenseExpiryNotification(
         licenseId: license.id!,
         title: 'License Expiring Soon',
-        body: 'Your license will expire in $daysUntilExpiry days. Please renew to continue using all features.',
+        body:
+            'Your license will expire in $daysUntilExpiry days. Please renew to continue using all features.',
       );
     } else if (daysUntilExpiry <= 0) {
       await NotificationService.instance.showLicenseExpiryNotification(
         licenseId: license.id!,
         title: 'License Expired',
-        body: 'Your license has expired. Please renew now to continue using all features.',
+        body:
+            'Your license has expired. Please renew now to continue using all features.',
       );
     }
   }
 
   Future<void> scheduleExpiryNotifications(License license) async {
-    if (license.expiryDate == null) return;
+    if (license.expiryDate == null || license.id == null) {
+      debugPrint('Cannot schedule notifications: license ID or expiry date is null');
+      return;
+    }
 
-    // Cancel any existing notifications first
-    await NotificationService.instance.cancelLicenseNotifications(license.id!);
+    try {
+      // Initialize notification service
+      final notificationService = NotificationService.instance;
+      final initialized = await notificationService.initialize();
+      
+      if (!initialized) {
+        debugPrint('Failed to initialize notification service');
+        return;
+      }
 
-    // Schedule new notifications
-    await NotificationService.instance.scheduleLicenseExpiryNotification(
-      licenseId: license.id!,
-      expiryDate: license.expiryDate!,
-    );
+      // Cancel any existing notifications first
+      await notificationService.cancelLicenseNotifications(license.id!);
+
+      // Schedule new notifications
+      final scheduled = await notificationService.scheduleLicenseExpiryNotification(
+        licenseId: license.id!,
+        expiryDate: license.expiryDate!,
+      );
+
+      if (scheduled) {
+        debugPrint('Successfully scheduled license expiry notifications');
+      } else {
+        debugPrint('Failed to schedule license expiry notifications');
+      }
+    } catch (e) {
+      debugPrint('Error scheduling license expiry notifications: $e');
+      // Don't rethrow - we want to continue with license activation even if notifications fail
+    }
   }
 
   Future<bool> verifyLicenseWithServer(String licenseKey, String email) async {
     try {
-        debugPrint('Verifying license with server - Key: $licenseKey, Email: $email');
-        
-        final response = await _apiService.apiCall(
-            '/api/customers/verify-license',  // Changed from /api/admin/verify-license
-            method: 'POST',
-            body: {
-                'licenseKey': licenseKey,
-                'email': email,
-            },
-        );
+      debugPrint(
+          'Verifying license with server - Key: $licenseKey, Email: $email');
 
-        debugPrint('License verification response: $response');
+      final response = await _apiService.apiCall(
+        '/api/customers/verify-license', // Changed from /api/admin/verify-license
+        method: 'POST',
+        body: {
+          'licenseKey': licenseKey,
+          'email': email,
+        },
+      );
 
-        if (!response['success']) {
-            throw Exception(response['error'] ?? 'License verification failed');
-        }
+      debugPrint('License verification response: $response');
 
-        // Store verified license data if successful
-        if (response['data']?.containsKey('license')) {
-            await DatabaseHelper.instance.saveLicense(
-                License.fromMap(response['data']['license'])
-            );
-        }
+      if (!response['success']) {
+        throw Exception(response['error'] ?? 'License verification failed');
+      }
 
-        return true;
+      // Store verified license data if successful
+      if (response['data']?.containsKey('license')) {
+        await DatabaseHelper.instance
+            .saveLicense(License.fromMap(response['data']['license']));
+      }
+
+      return true;
     } catch (e) {
-        debugPrint('License verification error: $e');
-        return false;
+      debugPrint('License verification error: $e');
+      return false;
     }
   }
 

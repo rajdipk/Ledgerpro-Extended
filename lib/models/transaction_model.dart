@@ -2,6 +2,7 @@
 
 class Transaction {
   final int? id;
+  final int? businessId;
   final int? customerId;
   final int? supplierId;
   final double amount;
@@ -13,6 +14,7 @@ class Transaction {
 
   Transaction({
     this.id,
+    this.businessId,
     this.customerId,
     this.supplierId,
     required this.amount,
@@ -27,8 +29,11 @@ class Transaction {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id, // Include id if it's not null
-      if (customerId != null) 'customer_id': customerId, // Map customerId to customer_id
-      if (supplierId != null) 'supplier_id': supplierId, // Map supplierId to supplier_id
+      if (businessId != null) 'business_id': businessId, // Include business_id
+      if (customerId != null)
+        'customer_id': customerId, // Map customerId to customer_id
+      if (supplierId != null)
+        'supplier_id': supplierId, // Map supplierId to supplier_id
       'amount': amount, // Map the amount
       'date': date, // Map the date (consider DateTime)
       'balance': balance, // Map the balance
